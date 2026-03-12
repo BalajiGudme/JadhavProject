@@ -1,172 +1,1 @@
-// UserProfilePopup.jsx
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-
-const UserProfilePopup = ({ isOpen, onClose, userId = null }) => {
-  const [userProfile, setUserProfile] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (isOpen) {
-      fetchUserProfile();
-    }
-  }, [isOpen, userId]);
-
-  const fetchUserProfile = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      const token = localStorage.getItem('access');
-      let url = 'http://127.0.0.1:8000/api/profile/'
-      
-      if (userId) {                                        
-        url += `?user_id=${userId}`;
-      }
-
-      const response = await axios.get(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      setUserProfile(response.data);
-    } catch (err) {
-      setError('Failed to load user profile. Please try again.');
-      console.error('Error fetching user profile:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div 
-      className="fixed inset-0  bg-opacity-50 flex items-center justify-center p-4 z-50"
-      onClick={onClose}
-    >
-      <div 
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden transform transition-all"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white">User Profile</h2>
-            <button
-              onClick={onClose}
-              className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-1 transition-colors duration-200"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="p-6 max-h-[60vh] overflow-y-auto">
-          {loading && (
-            <div className="flex flex-col items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-              <p className="text-gray-600">Loading profile...</p>
-            </div>
-          )}
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-              <div className="flex items-center">
-                <svg className="w-5 h-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-                <p className="text-red-800 font-medium">Error</p>
-              </div>
-              <p className="text-red-600 mt-1 text-sm">{error}</p>
-              <button
-                onClick={fetchUserProfile}
-                className="mt-3 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
-              >
-                Try Again
-              </button>
-            </div>
-          )}
-
-          {userProfile && !loading && (
-            <div className="space-y-4">
-              {/* Profile Field Component */}
-              <ProfileField label="Full Name" value={userProfile.full_name} />
-              <ProfileField label="Username" value={userProfile.username} />
-              <ProfileField label="Email" value={userProfile.email} />
-              <ProfileField label="Phone" value={userProfile.phone_number} />
-              <ProfileField label="College/Company" value={userProfile.college_company} />
-              
-              <div className="border-t border-gray-200 pt-4">
-                <ProfileField label="Address" value={userProfile.address} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="text-sm font-medium text-gray-500 block mb-1">Role</span>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    userProfile.role === 'admin' 
-                      ? 'bg-purple-100 text-purple-800' 
-                      : 'bg-blue-100 text-blue-800'
-                  }`}>
-                    {userProfile.role}
-                  </span>
-                </div>
-                
-                <div>
-                  <span className="text-sm font-medium text-gray-500 block mb-1">Status</span>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    userProfile.is_approved 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {userProfile.is_approved ? 'Approved' : 'Pending'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 rounded-lg p-4 mt-4">
-                <div className="flex items-center text-sm text-gray-600">
-                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                  </svg>
-                  Member since {new Date(userProfile.date_joined).toLocaleDateString()}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-          <div className="flex justify-end">
-            <button
-              onClick={onClose}
-              className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Reusable Profile Field Component
-const ProfileField = ({ label, value }) => (
-  <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
-    <span className="text-sm font-medium text-gray-500 mb-1 sm:mb-0 sm:w-1/3">{label}</span>
-    <span className="text-gray-900 font-medium text-sm sm:w-2/3 sm:text-right break-words">
-      {value || 'Not provided'}
-    </span>
-  </div>
-);
-
-export default UserProfilePopup;
+// UserProfilePopup.jsximport React, { useState, useEffect } from 'react';import axios from 'axios';const UserProfilePopup = ({ isOpen, onClose, userId = null }) => {  const [userProfile, setUserProfile] = useState(null);  const [loading, setLoading] = useState(false);  const [error, setError] = useState('');  useEffect(() => {    if (isOpen) {      fetchUserProfile();    }  }, [isOpen, userId]);  const fetchUserProfile = async () => {    try {      setLoading(true);      setError('');      const token = localStorage.getItem('access');      let url = 'http://127.0.0.1:8000/api/profile/'      if (userId) {                                                url += `?user_id=${userId}`;      }      const response = await axios.get(url, {        headers: {          'Authorization': `Bearer ${token}`,          'Content-Type': 'application/json'        }      });      setUserProfile(response.data);    } catch (err) {      setError('Failed to load user profile. Please try again.');    } finally {      setLoading(false);    }  };  if (!isOpen) return null;  return (    <div       className="fixed inset-0  bg-opacity-50 flex items-center justify-center p-4 z-50"      onClick={onClose}    >      <div         className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden transform transition-all"        onClick={(e) => e.stopPropagation()}      >        {/* Header */}        <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4">          <div className="flex items-center justify-between">            <h2 className="text-xl font-bold text-white">User Profile</h2>            <button              onClick={onClose}              className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-1 transition-colors duration-200"            >              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />              </svg>            </button>          </div>        </div>        {/* Body */}        <div className="p-6 max-h-[60vh] overflow-y-auto">          {loading && (            <div className="flex flex-col items-center justify-center py-8">              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>              <p className="text-gray-600">Loading profile...</p>            </div>          )}          {error && (            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">              <div className="flex items-center">                <svg className="w-5 h-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />                </svg>                <p className="text-red-800 font-medium">Error</p>              </div>              <p className="text-red-600 mt-1 text-sm">{error}</p>              <button                onClick={fetchUserProfile}                className="mt-3 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"              >                Try Again              </button>            </div>          )}          {userProfile && !loading && (            <div className="space-y-4">              {/* Profile Field Component */}              <ProfileField label="Full Name" value={userProfile.full_name} />              <ProfileField label="Username" value={userProfile.username} />              <ProfileField label="Email" value={userProfile.email} />              <ProfileField label="Phone" value={userProfile.phone_number} />              <ProfileField label="College/Company" value={userProfile.college_company} />              <div className="border-t border-gray-200 pt-4">                <ProfileField label="Address" value={userProfile.address} />              </div>              <div className="grid grid-cols-2 gap-4">                <div>                  <span className="text-sm font-medium text-gray-500 block mb-1">Role</span>                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${                    userProfile.role === 'admin'                       ? 'bg-purple-100 text-purple-800'                       : 'bg-blue-100 text-blue-800'                  }`}>                    {userProfile.role}                  </span>                </div>                <div>                  <span className="text-sm font-medium text-gray-500 block mb-1">Status</span>                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${                    userProfile.is_approved                       ? 'bg-green-100 text-green-800'                       : 'bg-yellow-100 text-yellow-800'                  }`}>                    {userProfile.is_approved ? 'Approved' : 'Pending'}                  </span>                </div>              </div>              <div className="bg-gray-50 rounded-lg p-4 mt-4">                <div className="flex items-center text-sm text-gray-600">                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />                  </svg>                  Member since {new Date(userProfile.date_joined).toLocaleDateString()}                </div>              </div>            </div>          )}        </div>        {/* Footer */}        <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">          <div className="flex justify-end">            <button              onClick={onClose}              className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"            >              Close            </button>          </div>        </div>      </div>    </div>  );};// Reusable Profile Field Componentconst ProfileField = ({ label, value }) => (  <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-gray-100 last:border-b-0">    <span className="text-sm font-medium text-gray-500 mb-1 sm:mb-0 sm:w-1/3">{label}</span>    <span className="text-gray-900 font-medium text-sm sm:w-2/3 sm:text-right break-words">      {value || 'Not provided'}    </span>  </div>);export default UserProfilePopup;

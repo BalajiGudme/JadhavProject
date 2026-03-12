@@ -1,100 +1,1 @@
-// src/services/api.js
-class APIError extends Error {
-  constructor(message, status) {
-    super(message);
-    this.status = status;
-    this.name = 'APIError';
-  }
-}
-
-// Mock data for development
-const mockForms = [
-  {
-    id: '1',
-    title: 'Student Registration Form',
-    description: 'Please fill out this form for student registration',
-    created_at: new Date().toISOString(),
-    is_published: true,
-    fields: [
-      {
-        id: '1',
-        label: 'Full Name',
-        field_type: 'text',
-        required: true,
-        placeholder: 'Enter your full name'
-      },
-      {
-        id: '2',
-        label: 'Email Address',
-        field_type: 'text',
-        required: true,
-        placeholder: 'Enter your email'
-      },
-      {
-        id: '3',
-        label: 'Student ID',
-        field_type: 'alphanumeric',
-        required: true,
-        placeholder: 'Enter your student ID'
-      }
-    ]
-  }
-];
-
-// Helper function for API requests with mock fallback
-const apiRequest = async (url, options = {}) => {
-  console.log(`API Request: ${url}`, options);
-  
-  // For development, return mock data instead of making actual API calls
-  if (url === '/forms/') {
-    return mockForms;
-  }
-  
-  if (url === '/public-forms/') {
-    return mockForms.filter(form => form.is_published);
-  }
-  
-  if (url.startsWith('/forms/') && options.method === 'POST') {
-    // Simulate form creation
-    return { 
-      id: Date.now().toString(), 
-      ...JSON.parse(options.body),
-      created_at: new Date().toISOString(),
-      is_published: false
-    };
-  }
-  
-  // Default mock response
-  return { status: 'success', message: 'Operation completed' };
-};
-
-// API methods
-export const getForms = () => apiRequest('/forms/');
-export const getForm = (id) => apiRequest(`/forms/${id}/`);
-export const createForm = (data) => apiRequest('/forms/', { method: 'POST', body: data });
-export const updateForm = (id, data) => apiRequest(`/forms/${id}/`, { method: 'PUT', body: data });
-export const deleteForm = (id) => apiRequest(`/forms/${id}/`, { method: 'DELETE' });
-export const publishForm = (id) => apiRequest(`/forms/${id}/publish/`, { method: 'POST' });
-export const unpublishForm = (id) => apiRequest(`/forms/${id}/unpublish/`, { method: 'POST' });
-
-// Public forms
-export const getPublicForms = () => apiRequest('/public-forms/');
-export const submitForm = (formId, data) => apiRequest(`/public-forms/${formId}/submit/`, { 
-  method: 'POST', 
-  body: data 
-});
-
-// Export as an object for backward compatibility
-export const formAPI = {
-  getForms,
-  getForm,
-  createForm,
-  updateForm,
-  deleteForm,
-  publishForm,
-  unpublishForm,
-  getPublicForms,
-  submitForm
-};
-
-export default formAPI;
+// src/services/api.jsclass APIError extends Error {  constructor(message, status) {    super(message);    this.status = status;    this.name = 'APIError';  }}// Mock data for developmentconst mockForms = [  {    id: '1',    title: 'Student Registration Form',    description: 'Please fill out this form for student registration',    created_at: new Date().toISOString(),    is_published: true,    fields: [      {        id: '1',        label: 'Full Name',        field_type: 'text',        required: true,        placeholder: 'Enter your full name'      },      {        id: '2',        label: 'Email Address',        field_type: 'text',        required: true,        placeholder: 'Enter your email'      },      {        id: '3',        label: 'Student ID',        field_type: 'alphanumeric',        required: true,        placeholder: 'Enter your student ID'      }    ]  }];// Helper function for API requests with mock fallbackconst apiRequest = async (url, options = {}) => {  // For development, return mock data instead of making actual API calls  if (url === '/forms/') {    return mockForms;  }  if (url === '/public-forms/') {    return mockForms.filter(form => form.is_published);  }  if (url.startsWith('/forms/') && options.method === 'POST') {    // Simulate form creation    return {       id: Date.now().toString(),       ...JSON.parse(options.body),      created_at: new Date().toISOString(),      is_published: false    };  }  // Default mock response  return { status: 'success', message: 'Operation completed' };};// API methodsexport const getForms = () => apiRequest('/forms/');export const getForm = (id) => apiRequest(`/forms/${id}/`);export const createForm = (data) => apiRequest('/forms/', { method: 'POST', body: data });export const updateForm = (id, data) => apiRequest(`/forms/${id}/`, { method: 'PUT', body: data });export const deleteForm = (id) => apiRequest(`/forms/${id}/`, { method: 'DELETE' });export const publishForm = (id) => apiRequest(`/forms/${id}/publish/`, { method: 'POST' });export const unpublishForm = (id) => apiRequest(`/forms/${id}/unpublish/`, { method: 'POST' });// Public formsexport const getPublicForms = () => apiRequest('/public-forms/');export const submitForm = (formId, data) => apiRequest(`/public-forms/${formId}/submit/`, {   method: 'POST',   body: data });// Export as an object for backward compatibilityexport const formAPI = {  getForms,  getForm,  createForm,  updateForm,  deleteForm,  publishForm,  unpublishForm,  getPublicForms,  submitForm};export default formAPI;

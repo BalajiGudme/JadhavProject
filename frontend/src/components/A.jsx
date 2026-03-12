@@ -1,127 +1,1 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-
-const A = () => {
-  const [architecture, setArchitecture] = useState(null);
-  const [responses, setResponses] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const { architectureId } = useParams();
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/architecture/${architectureId}/responses/`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch architecture responses');
-        }
-        
-        const data = await response.json();
-        setArchitecture(data.architecture);
-        setResponses(data.responses);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [architectureId]);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-        <strong className="font-bold">Error: </strong>
-        <span className="block sm:inline">{error}</span>
-      </div>
-    );
-  }
-
-  if (!architecture) {
-    return (
-      <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
-        <span className="block sm:inline">Architecture not found</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">
-        Responses for {architecture.name}
-      </h1>
-      
-      {responses.length === 0 ? (
-        <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
-          No responses found for this architecture.
-        </div>
-      ) : (
-        <div className="bg-white shadow-md rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Field
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Value
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Submitted At
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {responses.map((response) => (
-                <tr key={response.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {response.field_label}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {response.field_type}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {response.value !== null && response.value !== undefined ? (
-                      response.field_type === 'image' ? (
-                        <img 
-                          src={response.value} 
-                          alt={response.field_label}
-                          className="h-16 w-16 object-cover rounded"
-                        />
-                      ) : (
-                        response.value.toString()
-                      )
-                    ) : (
-                      <span className="text-gray-400">No value</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(response.created_at).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default A;
+import React, { useState, useEffect } from 'react';import { useParams } from 'react-router-dom';const A = () => {  const [architecture, setArchitecture] = useState(null);  const [responses, setResponses] = useState([]);  const [loading, setLoading] = useState(true);  const [error, setError] = useState(null);  const { architectureId } = useParams();  useEffect(() => {    const fetchData = async () => {      try {        setLoading(true);        const response = await fetch(`/api/architecture/${architectureId}/responses/`);        if (!response.ok) {          throw new Error('Failed to fetch architecture responses');        }        const data = await response.json();        setArchitecture(data.architecture);        setResponses(data.responses);      } catch (err) {        setError(err.message);      } finally {        setLoading(false);      }    };    fetchData();  }, [architectureId]);  if (loading) {    return (      <div className="flex justify-center items-center h-64">        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>      </div>    );  }  if (error) {    return (      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">        <strong className="font-bold">Error: </strong>        <span className="block sm:inline">{error}</span>      </div>    );  }  if (!architecture) {    return (      <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">        <span className="block sm:inline">Architecture not found</span>      </div>    );  }  return (    <div className="container mx-auto px-4 py-8">      <h1 className="text-3xl font-bold mb-6 text-gray-800">        Responses for {architecture.name}      </h1>      {responses.length === 0 ? (        <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">          No responses found for this architecture.        </div>      ) : (        <div className="bg-white shadow-md rounded-lg overflow-hidden">          <table className="min-w-full divide-y divide-gray-200">            <thead className="bg-gray-50">              <tr>                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">                  Field                </th>                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">                  Type                </th>                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">                  Value                </th>                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">                  Submitted At                </th>              </tr>            </thead>            <tbody className="bg-white divide-y divide-gray-200">              {responses.map((response) => (                <tr key={response.id}>                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">                    {response.field_label}                  </td>                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">                      {response.field_type}                    </span>                  </td>                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">                    {response.value !== null && response.value !== undefined ? (                      response.field_type === 'image' ? (                        <img                           src={response.value}                           alt={response.field_label}                          className="h-16 w-16 object-cover rounded"                        />                      ) : (                        response.value.toString()                      )                    ) : (                      <span className="text-gray-400">No value</span>                    )}                  </td>                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">                    {new Date(response.created_at).toLocaleString()}                  </td>                </tr>              ))}            </tbody>          </table>        </div>      )}    </div>  );};export default A;

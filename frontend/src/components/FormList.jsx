@@ -1,402 +1,1 @@
-// export default FormList;
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
-
-const API_BASE = "http://localhost:8000/api";
-
-const FormList = () => {
-  const [forms, setForms] = useState([]);
-  const [selectedForm, setSelectedForm] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [view, setView] = useState("list");
-  const [actionLoading, setActionLoading] = useState(null);
-  const navigate = useNavigate();
-
-  // Create axios instance with auth header
-  const api = axios.create({
-    baseURL: API_BASE,
-  });
-
-  // Add token to requests
-  api.interceptors.request.use(
-    (config) => {
-      const token = localStorage.getItem("access");
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
-    },
-    (error) => {
-      return Promise.reject(error);
-    }
-  );
-
-  // Handle auth errors
-  api.interceptors.response.use(
-    (response) => response,
-    (error) => {
-      if (error.response?.status === 401) {
-        localStorage.removeItem("access");
-        navigate("/login");
-      }
-      return Promise.reject(error);
-    }
-  );
-
-  useEffect(() => {
-    loadForms();
-  }, []);
-
-  const loadForms = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await api.get("/forms/");
-      setForms(response.data);
-    } catch (err) {
-      console.error("Error loading forms:", err);
-      if (err.response?.status === 401) {
-        navigate("/login");
-      } else {
-        setError("Failed to load forms. Please try again.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePublishToggle = async (formId, isPublished) => {
-    try {
-      setActionLoading(formId);
-      const endpoint = isPublished ? "unpublish" : "publish";
-      await api.post(`/forms/${formId}/${endpoint}/`);
-      await loadForms(); // Refresh list
-    } catch (err) {
-      console.error("Error toggling publish status:", err);
-      if (err.response?.status === 401) {
-        navigate("/login");
-      } else {
-        setError("Failed to update publish status.");
-      }
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleDelete = async (formId) => {
-    const confirmed = window.confirm("Are you sure you want to delete this form? This action cannot be undone.");
-    if (!confirmed) return;
-
-    try {
-      setActionLoading(formId);
-      await api.delete(`/forms/${formId}/`);
-      await loadForms();
-      
-      if (selectedForm && selectedForm.id === formId) {
-        setSelectedForm(null);
-        setView("list");
-      }
-    } catch (err) {
-      console.error("Error deleting form:", err);
-      if (err.response?.status === 401) {
-        navigate("/login");
-      } else {
-        setError("Failed to delete form.");
-      }
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleSelectForm = (form) => {
-    setSelectedForm(form);
-    setView("detail");
-  };
-
-  const handleBackToList = () => {
-    setSelectedForm(null);
-    setView("list");
-  };
-
-  const handleCreateForm = () => {
-    navigate("/formbuilder");
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading your forms...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 py-4 sm:py-6 lg:py-8 mt-20">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 truncate">Form Management</h1>
-            <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">Create and manage your forms</p>
-          </div>
-          <div className="flex flex-col xs:flex-row gap-2 w-full sm:w-auto">
-            <button
-              onClick={handleCreateForm}
-              className="px-3 sm:px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm sm:text-base w-full sm:w-auto"
-            >
-              Create Form
-            </button>
-            <button
-              onClick={loadForms}
-              className="px-3 sm:px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm sm:text-base w-full sm:w-auto"
-            >
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-3 sm:px-4 py-3 rounded mb-4 sm:mb-6">
-            <div className="flex justify-between items-center">
-              <span className="text-sm sm:text-base">{error}</span>
-              <button
-                onClick={() => setError(null)}
-                className="text-red-700 hover:text-red-900 ml-2 flex-shrink-0"
-              >
-                ×
-              </button>
-            </div>
-          </div>
-        )}
-
-        {view === "list" && (
-          <>
-            <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6 mb-4 sm:mb-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">Your Forms</h2>
-                <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                  {forms.length} form{forms.length !== 1 ? 's' : ''} total
-                </span>
-              </div>
-              
-              {forms.length === 0 ? (
-                <div className="text-center py-8 sm:py-12">
-                  <div className="text-gray-400 mb-4">
-                    <svg className="mx-auto h-12 w-12 sm:h-16 sm:w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No forms yet</h3>
-                  <p className="text-gray-500 mb-4 text-sm sm:text-base">Get started by creating your first form.</p>
-                  <button 
-                    onClick={handleCreateForm}
-                    className="px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
-                  >
-                    Create Your First Form
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                  {forms.map((form) => (
-                    <div
-                      key={form.id}
-                      className="border border-gray-200 rounded-lg p-4 sm:p-6 bg-white hover:shadow-md transition-all cursor-pointer group"
-                      onClick={() => handleSelectForm(form)}
-                    >
-                      <div className="flex justify-between items-start gap-3 mb-3">
-                        <h3 className="text-base sm:text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 flex-1 min-w-0">
-                          {form.title}
-                        </h3>
-                        <span
-                          className={`px-2 py-1 text-xs rounded-full flex-shrink-0 ${
-                            form.is_published
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {form.is_published ? "Published" : "Draft"}
-                        </span>
-                      </div>
-                      
-                      <p className="text-gray-600 text-sm mb-4 line-clamp-3 min-h-[3rem]">
-                        {form.description || "No description provided"}
-                      </p>
-
-                      <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-2 mb-3">
-                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                          {form.fields?.length || 0} field{form.fields?.length !== 1 ? 's' : ''}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(form.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col xs:flex-row gap-2 pt-3 border-t border-gray-100">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePublishToggle(form.id, form.is_published);
-                          }}
-                          disabled={actionLoading === form.id}
-                          className={`px-3 py-1.5 text-xs rounded transition-colors flex-1 ${
-                            form.is_published
-                              ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 disabled:bg-yellow-50"
-                              : "bg-blue-100 text-blue-800 hover:bg-blue-200 disabled:bg-blue-50"
-                          }`}
-                        >
-                          {actionLoading === form.id ? "..." : (form.is_published ? "Unpublish" : "Publish")}
-                        </button>
-
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(form.id);
-                          }}
-                          disabled={actionLoading === form.id}
-                          className="px-3 py-1.5 text-xs bg-red-100 text-red-800 rounded hover:bg-red-200 disabled:bg-red-50 transition-colors flex-1 xs:flex-none"
-                        >
-                          {actionLoading === form.id ? "..." : "Delete"}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </>
-        )}
-
-        {view === "detail" && selectedForm && (
-          <div className="bg-white rounded-lg shadow-sm border">
-            {/* Header */}
-            <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-start gap-4">
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{selectedForm.title}</h2>
-                  <p className="text-gray-600 mt-1 text-sm sm:text-base break-words">
-                    {selectedForm.description || "No description"}
-                  </p>
-                </div>
-                <div className="flex flex-col xs:flex-row gap-2 w-full sm:w-auto">
-                  <button
-                    onClick={handleBackToList}
-                    className="px-3 sm:px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm sm:text-base w-full sm:w-auto"
-                  >
-                    Back to List
-                  </button>
-                </div>
-              </div>
-              
-              <div className="flex flex-wrap gap-2 mt-4">
-                <span
-                  className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-full ${
-                    selectedForm.is_published
-                      ? "bg-green-100 text-green-800"
-                      : "bg-gray-100 text-gray-800"
-                  }`}
-                >
-                  {selectedForm.is_published ? "Published" : "Draft"}
-                </span>
-                <span className="text-xs sm:text-sm text-gray-500 bg-gray-100 px-2 sm:px-3 py-1 rounded">
-                  Created: {new Date(selectedForm.created_at).toLocaleDateString()}
-                </span>
-                <span className="text-xs sm:text-sm text-gray-500 bg-gray-100 px-2 sm:px-3 py-1 rounded">
-                  Updated: {new Date(selectedForm.updated_at).toLocaleDateString()}
-                </span>
-                <span className="text-xs sm:text-sm text-gray-500 bg-gray-100 px-2 sm:px-3 py-1 rounded">
-                  Fields: {selectedForm.fields?.length || 0}
-                </span>
-              </div>
-            </div>
-
-            {/* Form Fields */}
-            <div className="p-4 sm:p-6">
-              <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Form Fields</h3>
-              
-              {selectedForm.fields?.length > 0 ? (
-                <div className="space-y-3 sm:space-y-4">
-                  {selectedForm.fields.map((field, index) => (
-                    <div key={field.id || index} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-gray-50">
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-start gap-2 mb-2">
-                        <h4 className="font-medium text-gray-900 break-words">
-                          {field.label}
-                          {field.required && <span className="text-red-500 ml-1">*</span>}
-                        </h4>
-                        <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded capitalize flex-shrink-0">
-                          {field.field_type}
-                        </span>
-                      </div>
-                      
-                      {field.options && field.options.length > 0 && (
-                        <div className="mt-2">
-                          <p className="text-sm text-gray-600 mb-1">Options:</p>
-                          <div className="flex flex-wrap gap-1">
-                            {field.options.map((option, optIndex) => (
-                              <span
-                                key={optIndex}
-                                className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded break-words max-w-full"
-                              >
-                                {option}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 sm:py-8 text-gray-500 bg-gray-50 rounded-lg">
-                  <svg className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p className="mt-2 text-sm sm:text-base">No fields defined for this form.</p>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200">
-                <div className="flex flex-col xs:flex-row gap-2 sm:gap-4">
-                  <button
-                    onClick={() => handlePublishToggle(selectedForm.id, selectedForm.is_published)}
-                    disabled={actionLoading === selectedForm.id}
-                    className={`px-4 sm:px-6 py-2 rounded-lg transition-colors flex-1 text-sm sm:text-base ${
-                      selectedForm.is_published
-                        ? "bg-yellow-500 text-white hover:bg-yellow-600 disabled:bg-yellow-400"
-                        : "bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-400"
-                    }`}
-                  >
-                    {actionLoading === selectedForm.id ? "Processing..." : (selectedForm.is_published ? "Unpublish Form" : "Publish Form")}
-                  </button>
-
-                  <button
-                    onClick={() => handleDelete(selectedForm.id)}
-                    disabled={actionLoading === selectedForm.id}
-                    className="px-4 sm:px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:bg-red-400 transition-colors flex-1 text-sm sm:text-base"
-                  >
-                    {actionLoading === selectedForm.id ? "Deleting..." : "Delete Form"}
-                  </button>
-
-                  <button
-                    onClick={handleCreateForm}
-                    className="px-4 sm:px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex-1 text-sm sm:text-base"
-                  >
-                    Create New Form
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default FormList;
+// export default FormList;import { useState, useEffect } from "react";import { useNavigate } from "react-router-dom";import axios from "axios";const API_BASE = "http://localhost:8000/api";const FormList = () => {  const [forms, setForms] = useState([]);  const [selectedForm, setSelectedForm] = useState(null);  const [loading, setLoading] = useState(true);  const [error, setError] = useState(null);  const [view, setView] = useState("list");  const [actionLoading, setActionLoading] = useState(null);  const navigate = useNavigate();  // Create axios instance with auth header  const api = axios.create({    baseURL: API_BASE,  });  // Add token to requests  api.interceptors.request.use(    (config) => {      const token = localStorage.getItem("access");      if (token) {        config.headers.Authorization = `Bearer ${token}`;      }      return config;    },    (error) => {      return Promise.reject(error);    }  );  // Handle auth errors  api.interceptors.response.use(    (response) => response,    (error) => {      if (error.response?.status === 401) {        localStorage.removeItem("access");        navigate("/login");      }      return Promise.reject(error);    }  );  useEffect(() => {    loadForms();  }, []);  const loadForms = async () => {    try {      setLoading(true);      setError(null);      const response = await api.get("/forms/");      setForms(response.data);    } catch (err) {      if (err.response?.status === 401) {        navigate("/login");      } else {        setError("Failed to load forms. Please try again.");      }    } finally {      setLoading(false);    }  };  const handlePublishToggle = async (formId, isPublished) => {    try {      setActionLoading(formId);      const endpoint = isPublished ? "unpublish" : "publish";      await api.post(`/forms/${formId}/${endpoint}/`);      await loadForms(); // Refresh list    } catch (err) {      if (err.response?.status === 401) {        navigate("/login");      } else {        setError("Failed to update publish status.");      }    } finally {      setActionLoading(null);    }  };  const handleDelete = async (formId) => {    const confirmed = window.confirm("Are you sure you want to delete this form? This action cannot be undone.");    if (!confirmed) return;    try {      setActionLoading(formId);      await api.delete(`/forms/${formId}/`);      await loadForms();      if (selectedForm && selectedForm.id === formId) {        setSelectedForm(null);        setView("list");      }    } catch (err) {      if (err.response?.status === 401) {        navigate("/login");      } else {        setError("Failed to delete form.");      }    } finally {      setActionLoading(null);    }  };  const handleSelectForm = (form) => {    setSelectedForm(form);    setView("detail");  };  const handleBackToList = () => {    setSelectedForm(null);    setView("list");  };  const handleCreateForm = () => {    navigate("/formbuilder");  };  if (loading) {    return (      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">        <div className="text-center">          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>          <p className="mt-4 text-gray-600">Loading your forms...</p>        </div>      </div>    );  }  return (    <div className="min-h-screen bg-gray-50 py-4 sm:py-6 lg:py-8 mt-20">      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">        {/* Header */}        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">          <div className="flex-1 min-w-0">            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 truncate">Form Management</h1>            <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">Create and manage your forms</p>          </div>          <div className="flex flex-col xs:flex-row gap-2 w-full sm:w-auto">            <button              onClick={handleCreateForm}              className="px-3 sm:px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm sm:text-base w-full sm:w-auto"            >              Create Form            </button>            <button              onClick={loadForms}              className="px-3 sm:px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm sm:text-base w-full sm:w-auto"            >              Refresh            </button>          </div>        </div>        {error && (          <div className="bg-red-100 border border-red-400 text-red-700 px-3 sm:px-4 py-3 rounded mb-4 sm:mb-6">            <div className="flex justify-between items-center">              <span className="text-sm sm:text-base">{error}</span>              <button                onClick={() => setError(null)}                className="text-red-700 hover:text-red-900 ml-2 flex-shrink-0"              >                ×              </button>            </div>          </div>        )}        {view === "list" && (          <>            <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6 mb-4 sm:mb-6">              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">                <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">Your Forms</h2>                <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">                  {forms.length} form{forms.length !== 1 ? 's' : ''} total                </span>              </div>              {forms.length === 0 ? (                <div className="text-center py-8 sm:py-12">                  <div className="text-gray-400 mb-4">                    <svg className="mx-auto h-12 w-12 sm:h-16 sm:w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />                    </svg>                  </div>                  <h3 className="text-lg font-medium text-gray-900 mb-2">No forms yet</h3>                  <p className="text-gray-500 mb-4 text-sm sm:text-base">Get started by creating your first form.</p>                  <button                     onClick={handleCreateForm}                    className="px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"                  >                    Create Your First Form                  </button>                </div>              ) : (                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">                  {forms.map((form) => (                    <div                      key={form.id}                      className="border border-gray-200 rounded-lg p-4 sm:p-6 bg-white hover:shadow-md transition-all cursor-pointer group"                      onClick={() => handleSelectForm(form)}                    >                      <div className="flex justify-between items-start gap-3 mb-3">                        <h3 className="text-base sm:text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 flex-1 min-w-0">                          {form.title}                        </h3>                        <span                          className={`px-2 py-1 text-xs rounded-full flex-shrink-0 ${                            form.is_published                              ? "bg-green-100 text-green-800"                              : "bg-gray-100 text-gray-800"                          }`}                        >                          {form.is_published ? "Published" : "Draft"}                        </span>                      </div>                      <p className="text-gray-600 text-sm mb-4 line-clamp-3 min-h-[3rem]">                        {form.description || "No description provided"}                      </p>                      <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-2 mb-3">                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">                          {form.fields?.length || 0} field{form.fields?.length !== 1 ? 's' : ''}                        </span>                        <span className="text-xs text-gray-500">                          {new Date(form.created_at).toLocaleDateString()}                        </span>                      </div>                      <div className="flex flex-col xs:flex-row gap-2 pt-3 border-t border-gray-100">                        <button                          onClick={(e) => {                            e.stopPropagation();                            handlePublishToggle(form.id, form.is_published);                          }}                          disabled={actionLoading === form.id}                          className={`px-3 py-1.5 text-xs rounded transition-colors flex-1 ${                            form.is_published                              ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 disabled:bg-yellow-50"                              : "bg-blue-100 text-blue-800 hover:bg-blue-200 disabled:bg-blue-50"                          }`}                        >                          {actionLoading === form.id ? "..." : (form.is_published ? "Unpublish" : "Publish")}                        </button>                        <button                          onClick={(e) => {                            e.stopPropagation();                            handleDelete(form.id);                          }}                          disabled={actionLoading === form.id}                          className="px-3 py-1.5 text-xs bg-red-100 text-red-800 rounded hover:bg-red-200 disabled:bg-red-50 transition-colors flex-1 xs:flex-none"                        >                          {actionLoading === form.id ? "..." : "Delete"}                        </button>                      </div>                    </div>                  ))}                </div>              )}            </div>          </>        )}        {view === "detail" && selectedForm && (          <div className="bg-white rounded-lg shadow-sm border">            {/* Header */}            <div className="px-4 sm:px-6 py-4 border-b border-gray-200">              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-start gap-4">                <div className="flex-1 min-w-0">                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{selectedForm.title}</h2>                  <p className="text-gray-600 mt-1 text-sm sm:text-base break-words">                    {selectedForm.description || "No description"}                  </p>                </div>                <div className="flex flex-col xs:flex-row gap-2 w-full sm:w-auto">                  <button                    onClick={handleBackToList}                    className="px-3 sm:px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm sm:text-base w-full sm:w-auto"                  >                    Back to List                  </button>                </div>              </div>              <div className="flex flex-wrap gap-2 mt-4">                <span                  className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-full ${                    selectedForm.is_published                      ? "bg-green-100 text-green-800"                      : "bg-gray-100 text-gray-800"                  }`}                >                  {selectedForm.is_published ? "Published" : "Draft"}                </span>                <span className="text-xs sm:text-sm text-gray-500 bg-gray-100 px-2 sm:px-3 py-1 rounded">                  Created: {new Date(selectedForm.created_at).toLocaleDateString()}                </span>                <span className="text-xs sm:text-sm text-gray-500 bg-gray-100 px-2 sm:px-3 py-1 rounded">                  Updated: {new Date(selectedForm.updated_at).toLocaleDateString()}                </span>                <span className="text-xs sm:text-sm text-gray-500 bg-gray-100 px-2 sm:px-3 py-1 rounded">                  Fields: {selectedForm.fields?.length || 0}                </span>              </div>            </div>            {/* Form Fields */}            <div className="p-4 sm:p-6">              <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Form Fields</h3>              {selectedForm.fields?.length > 0 ? (                <div className="space-y-3 sm:space-y-4">                  {selectedForm.fields.map((field, index) => (                    <div key={field.id || index} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-gray-50">                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-start gap-2 mb-2">                        <h4 className="font-medium text-gray-900 break-words">                          {field.label}                          {field.required && <span className="text-red-500 ml-1">*</span>}                        </h4>                        <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded capitalize flex-shrink-0">                          {field.field_type}                        </span>                      </div>                      {field.options && field.options.length > 0 && (                        <div className="mt-2">                          <p className="text-sm text-gray-600 mb-1">Options:</p>                          <div className="flex flex-wrap gap-1">                            {field.options.map((option, optIndex) => (                              <span                                key={optIndex}                                className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded break-words max-w-full"                              >                                {option}                              </span>                            ))}                          </div>                        </div>                      )}                    </div>                  ))}                </div>              ) : (                <div className="text-center py-6 sm:py-8 text-gray-500 bg-gray-50 rounded-lg">                  <svg className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />                  </svg>                  <p className="mt-2 text-sm sm:text-base">No fields defined for this form.</p>                </div>              )}              {/* Actions */}              <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200">                <div className="flex flex-col xs:flex-row gap-2 sm:gap-4">                  <button                    onClick={() => handlePublishToggle(selectedForm.id, selectedForm.is_published)}                    disabled={actionLoading === selectedForm.id}                    className={`px-4 sm:px-6 py-2 rounded-lg transition-colors flex-1 text-sm sm:text-base ${                      selectedForm.is_published                        ? "bg-yellow-500 text-white hover:bg-yellow-600 disabled:bg-yellow-400"                        : "bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-400"                    }`}                  >                    {actionLoading === selectedForm.id ? "Processing..." : (selectedForm.is_published ? "Unpublish Form" : "Publish Form")}                  </button>                  <button                    onClick={() => handleDelete(selectedForm.id)}                    disabled={actionLoading === selectedForm.id}                    className="px-4 sm:px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:bg-red-400 transition-colors flex-1 text-sm sm:text-base"                  >                    {actionLoading === selectedForm.id ? "Deleting..." : "Delete Form"}                  </button>                  <button                    onClick={handleCreateForm}                    className="px-4 sm:px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex-1 text-sm sm:text-base"                  >                    Create New Form                  </button>                </div>              </div>            </div>          </div>        )}      </div>    </div>  );};export default FormList;

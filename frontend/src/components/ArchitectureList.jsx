@@ -1,157 +1,1 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import ArchitectureForm from './ArchitectureForm';
-
-const ArchitectureList = () => {
-  const [architectures, setArchitectures] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchArchitectures();
-  }, []);
-
-  const fetchArchitectures = async () => {
-    try {
-      const response = await axios.get('/api/architecture/');
-      setArchitectures(response.data);
-      setLoading(false);
-    } catch (err) {
-      console.error('Failed to fetch architectures');
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this item?')) {
-      try {
-        await axios.delete(`/api/architecture/${id}/`);
-        fetchArchitectures();
-      } catch (err) {
-        console.error('Failed to delete');
-      }
-    }
-  };
-
-  const handleEdit = (item) => {
-    setEditing(item);
-    setShowForm(true);
-  };
-
-  const handleFormClose = () => {
-    setShowForm(false);
-    setEditing(null);
-  };
-
-  const handleFormSave = () => {
-    setShowForm(false);
-    setEditing(null);
-    fetchArchitectures();
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-800">Architecture Management</h2>
-        <button
-          onClick={() => setShowForm(true)}
-          className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
-        >
-          <span>+</span>
-          Add New
-        </button>
-      </div>
-
-      {showForm && (
-        <ArchitectureForm
-          editData={editing}
-          onSave={handleFormSave}
-          onCancel={handleFormClose}
-        />
-      )}
-
-      <div className="grid gap-4">
-        {architectures.map(item => (
-          <div key={item.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <h4 className="font-semibold text-gray-800">{item.name}</h4>
-                  {item.institution_type && (
-                    <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
-                      {item.institution_type}
-                    </span>
-                  )}
-                  {!item.is_active && (
-                    <span className="text-sm text-red-600 bg-red-50 px-2 py-1 rounded-full">
-                      Inactive
-                    </span>
-                  )}
-                </div>
-
-                {(item.department_name || item.class_name || item.division) && (
-                  <p className="text-sm text-gray-600 mb-2">
-                    {item.department_name && `Department: ${item.department_name}`}
-                    {item.class_name && ` • Class: ${item.class_name}`}
-                    {item.division && ` • Division: ${item.division}`}
-                  </p>
-                )}
-
-                <div className="flex gap-4 text-sm text-gray-500">
-                  <span>👥 {item.student_count} students</span>
-                  <span>👨‍🏫 {item.staff_count} staff</span>
-                </div>
-
-                {item.parent_name && (
-                  <p className="text-xs text-gray-400 mt-2">
-                    Parent: {item.parent_name}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleEdit(item)}
-                  className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(item.id)}
-                  className="px-3 py-1 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {architectures.length === 0 && !showForm && (
-        <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
-          <div className="text-gray-400 text-6xl mb-4">🏢</div>
-          <h3 className="text-lg font-medium text-gray-600 mb-2">No architecture nodes</h3>
-          <p className="text-gray-500 mb-4">Get started by creating your first architecture node</p>
-          <button
-            onClick={() => setShowForm(true)}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-          >
-            Create First Node
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default ArchitectureList;
+import React, { useState, useEffect } from 'react';import axios from 'axios';import ArchitectureForm from './ArchitectureForm';const ArchitectureList = () => {  const [architectures, setArchitectures] = useState([]);  const [showForm, setShowForm] = useState(false);  const [editing, setEditing] = useState(null);  const [loading, setLoading] = useState(true);  useEffect(() => {    fetchArchitectures();  }, []);  const fetchArchitectures = async () => {    try {      const response = await axios.get('/api/architecture/');      setArchitectures(response.data);      setLoading(false);    } catch (err) {      setLoading(false);    }  };  const handleDelete = async (id) => {    if (window.confirm('Are you sure you want to delete this item?')) {      try {        await axios.delete(`/api/architecture/${id}/`);        fetchArchitectures();      } catch (err) {      }    }  };  const handleEdit = (item) => {    setEditing(item);    setShowForm(true);  };  const handleFormClose = () => {    setShowForm(false);    setEditing(null);  };  const handleFormSave = () => {    setShowForm(false);    setEditing(null);    fetchArchitectures();  };  if (loading) {    return (      <div className="flex items-center justify-center h-64">        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>      </div>    );  }  return (    <div className="space-y-6">      <div className="flex items-center justify-between">        <h2 className="text-2xl font-bold text-gray-800">Architecture Management</h2>        <button          onClick={() => setShowForm(true)}          className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"        >          <span>+</span>          Add New        </button>      </div>      {showForm && (        <ArchitectureForm          editData={editing}          onSave={handleFormSave}          onCancel={handleFormClose}        />      )}      <div className="grid gap-4">        {architectures.map(item => (          <div key={item.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">            <div className="flex items-start justify-between">              <div className="flex-1">                <div className="flex items-center gap-2 mb-2">                  <h4 className="font-semibold text-gray-800">{item.name}</h4>                  {item.institution_type && (                    <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded-full">                      {item.institution_type}                    </span>                  )}                  {!item.is_active && (                    <span className="text-sm text-red-600 bg-red-50 px-2 py-1 rounded-full">                      Inactive                    </span>                  )}                </div>                {(item.department_name || item.class_name || item.division) && (                  <p className="text-sm text-gray-600 mb-2">                    {item.department_name && `Department: ${item.department_name}`}                    {item.class_name && ` • Class: ${item.class_name}`}                    {item.division && ` • Division: ${item.division}`}                  </p>                )}                <div className="flex gap-4 text-sm text-gray-500">                  <span>👥 {item.student_count} students</span>                  <span>👨‍🏫 {item.staff_count} staff</span>                </div>                {item.parent_name && (                  <p className="text-xs text-gray-400 mt-2">                    Parent: {item.parent_name}                  </p>                )}              </div>              <div className="flex gap-2">                <button                  onClick={() => handleEdit(item)}                  className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"                >                  Edit                </button>                <button                  onClick={() => handleDelete(item.id)}                  className="px-3 py-1 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors"                >                  Delete                </button>              </div>            </div>          </div>        ))}      </div>      {architectures.length === 0 && !showForm && (        <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">          <div className="text-gray-400 text-6xl mb-4">🏢</div>          <h3 className="text-lg font-medium text-gray-600 mb-2">No architecture nodes</h3>          <p className="text-gray-500 mb-4">Get started by creating your first architecture node</p>          <button            onClick={() => setShowForm(true)}            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"          >            Create First Node          </button>        </div>      )}    </div>  );};export default ArchitectureList;

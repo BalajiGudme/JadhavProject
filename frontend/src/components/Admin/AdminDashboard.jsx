@@ -1,771 +1,1 @@
-
-
-import React, { useState, useEffect } from "react";
-
-// User Profile Popup Component
-const UserProfilePopup = ({ userId, isOpen, onClose }) => {
-  const [userProfile, setUserProfile] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const fetchUserProfile = async () => {
-    if (!userId) return;
-    
-    try {
-      setLoading(true);
-      setError('');
-      
-      const token = localStorage.getItem('access');
-      if (!token) { 
-        setError('Please log in to view user profile');
-        setLoading(false);
-        return;
-      }
-
-      const response = await fetch(`http://localhost:8000/api/user-profile/${userId}/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to load user profile');
-      }
-
-      const data = await response.json();
-      setUserProfile(data);
-    } catch (err) {
-      setError('Failed to load user profile. Please try again.');
-      console.error('Error fetching user profile:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen && userId) {
-      fetchUserProfile();
-    }
-  }, [isOpen, userId]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/25 bg-opacity-50 mt-16">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white">User Profile</h2>
-            <button
-              onClick={onClose}
-              className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-1 transition-colors duration-200"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="p-6 max-h-[60vh] overflow-y-auto">
-          {loading && (
-            <div className="flex flex-col items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-              <p className="text-gray-600">Loading profile...</p>
-            </div>
-          )}
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-              <div className="flex items-center">
-                <svg className="w-5 h-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-                <p className="text-red-800 font-medium">Error</p>
-              </div>
-              <p className="text-red-600 mt-1 text-sm">{error}</p>
-              <button
-                onClick={fetchUserProfile}
-                className="mt-3 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"
-              >
-                Try Again
-              </button>
-            </div>
-          )}
-
-          {userProfile && !loading && (
-            <div className="space-y-4">
-              {/* Profile Header */}
-              <div className="flex items-center space-x-4 mb-6">
-                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-xl font-bold">
-                  {(userProfile.full_name?.charAt(0) || userProfile.username?.charAt(0) || 'U').toUpperCase()}
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">
-                    {userProfile.full_name || userProfile.username || 'Unknown User'}
-                  </h3>
-                  <p className="text-gray-600 text-sm">{userProfile.email}</p>
-                </div>
-              </div>
-
-              {/* Profile Fields */}
-              <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm font-medium text-gray-500 mb-1 sm:mb-0 sm:w-1/3">Full Name</span>
-                  <span className="text-gray-900 font-medium text-sm sm:w-2/3 sm:text-right break-words">
-                    {userProfile.full_name || 'Not provided'}
-                  </span>
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm font-medium text-gray-500 mb-1 sm:mb-0 sm:w-1/3">Username</span>
-                  <span className="text-gray-900 font-medium text-sm sm:w-2/3 sm:text-right break-words">
-                    {userProfile.username || 'Not provided'}
-                  </span>
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm font-medium text-gray-500 mb-1 sm:mb-0 sm:w-1/3">Email</span>
-                  <span className="text-gray-900 font-medium text-sm sm:w-2/3 sm:text-right break-words">
-                    {userProfile.email || 'Not provided'}
-                  </span>
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm font-medium text-gray-500 mb-1 sm:mb-0 sm:w-1/3">Phone Number</span>
-                  <span className="text-gray-900 font-medium text-sm sm:w-2/3 sm:text-right break-words">
-                    {userProfile.phone_number || 'Not provided'}
-                  </span>
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm font-medium text-gray-500 mb-1 sm:mb-0 sm:w-1/3">College/Company</span>
-                  <span className="text-gray-900 font-medium text-sm sm:w-2/3 sm:text-right break-words">
-                    {userProfile.college_company || 'Not provided'}
-                  </span>
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-gray-100">
-                  <span className="text-sm font-medium text-gray-500 mb-1 sm:mb-0 sm:w-1/3">Address</span>
-                  <span className="text-gray-900 font-medium text-sm sm:w-2/3 sm:text-right break-words">
-                    {userProfile.address || 'Not provided'}
-                  </span>
-                </div>
-
-                {/* Role and Status in grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-                  <div>
-                    <span className="text-sm font-medium text-gray-500 block mb-1">Role</span>
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                      userProfile.role === 'admin' 
-                        ? 'bg-purple-100 text-purple-800' 
-                        : userProfile.role === 'staff'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-green-100 text-green-800'
-                    }`}>
-                      {userProfile.role || 'user'}
-                    </span>
-                  </div>
-                  
-                  <div>
-                    <span className="text-sm font-medium text-gray-500 block mb-1">Status</span>
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                      userProfile.is_approved 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {userProfile.is_approved ? 'Approved' : 'Pending'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Member since */}
-                <div className="bg-gray-50 rounded-lg p-4 mt-4">
-                  <div className="flex items-center text-sm text-gray-600">
-                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                    </svg>
-                    Member since {userProfile.date_joined ? new Date(userProfile.date_joined).toLocaleDateString() : 'Unknown'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-          <div className="flex justify-end">
-            <button
-              onClick={onClose}
-              className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState("all");
-  const [users, setUsers] = useState([]);
-  const [pendingUsers, setPendingUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [stats, setStats] = useState({
-    total: 0,
-    pending: 0,
-    approved: 0,
-  });
-
-  // New state for user profile popup
-  const [showUserProfile, setShowUserProfile] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState(null);
-
-  const API_BASE = "http://127.0.0.1:8000/api/auth";
-
-  const tabs = [
-    { id: "all", name: "All Users", count: stats.total, icon: "👥" },
-    { id: "pending", name: "Pending", count: stats.pending, icon: "⏳" },
-    { id: "approved", name: "Approved", count: stats.approved, icon: "✅" },
-  ];
-
-  // 🔐 Debug function to check authentication
-  const debugAuth = () => {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const token = localStorage.getItem("access");
-    
-    console.log("🔐 DEBUG AUTH INFO:");
-    console.log("User:", user);
-    console.log("Token Present:", !!token);
-    console.log("User Role:", user.role);
-    console.log("Is Staff:", user.is_staff);
-    console.log("Is Superuser:", user.is_superuser);
-    console.log("Is Approved:", user.is_approved);
-  };
-
-  // 🔐 Get token from localStorage with debug info
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("access");
-    console.log("🔑 Sending Token:", token ? "Present" : "Missing");
-    
-    return {
-      "Content-Type": "application/json",
-      Authorization: token ? `Bearer ${token}` : "",
-    };
-  };
-
-  // Handler for viewing user profile
-  const handleViewProfile = (userId) => {
-    setSelectedUserId(userId);
-    setShowUserProfile(true);
-  };
-
-  // Close user profile popup
-  const handleCloseUserProfile = () => {
-    setShowUserProfile(false);
-    setSelectedUserId(null);
-  };
-
-  // ✅ Fetch all users with better error handling
-  const fetchAllUsers = async () => {
-    try {
-      debugAuth(); // Debug info
-      
-      const response = await fetch(`${API_BASE}/users/`, {
-        headers: getAuthHeaders(),
-      });
-
-      console.log("👥 Users API Response:", response.status, response.statusText);
-
-      if (response.status === 401) {
-        // Clear invalid token and redirect
-        localStorage.removeItem("access");
-        localStorage.removeItem("refresh");
-        localStorage.removeItem("user");
-        throw new Error("Session expired. Please log in again.");
-      }
-
-      if (response.status === 403) {
-        throw new Error("Access denied. Admin privileges required.");
-      }
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch users: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log("📊 Users data:", data);
-      setUsers(data);
-      calculateStats(data);
-    } catch (err) {
-      console.error("❌ Fetch users error:", err);
-      setError(err.message);
-      
-      // Redirect to admin login if unauthorized
-      if (err.message.includes("Session expired") || err.message.includes("Access denied")) {
-        setTimeout(() => {
-          window.location.href = "/login-admin";
-        }, 3000);
-      }
-    }
-  };
-
-  // ✅ Fetch pending users with better error handling
-  const fetchPendingUsers = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/pending-users/`, {
-        headers: getAuthHeaders(),
-      });
-      const data = await response.json();
-      const pendingList = data.users || data;
-      setPendingUsers(pendingList);
-      
-      // Update just the pending count in stats
-      setStats(prevStats => ({
-        ...prevStats,
-        pending: pendingList.length
-      }));
-      
-    } catch (err) {
-      console.error("❌ Fetch pending users error:", err);
-      setError(err.message);
-    }
-  };
-
-  // ✅ Calculate statistics
-  const calculateStats = (userData) => {
-    const stats = {
-      total: userData.length,
-      pending: 0, // Temporary, will be updated by fetchPendingUsers
-      approved: userData.filter((user) => user.status === "approved" || user.is_approved).length,
-    };
-    setStats(stats);
-  };
-
-  // ✅ Load initial data
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        await Promise.all([fetchAllUsers(), fetchPendingUsers()]);
-      } catch (err) {
-        console.error("❌ Initial data load error:", err);
-        setError("Failed to load dashboard data: " + err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, []);
-
-  // ✅ Approve user
-  const handleApprove = async (userId) => {
-    try {
-      const response = await fetch(`${API_BASE}/approve-user/${userId}/`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-      });
-
-      if (response.status === 401) {
-        throw new Error("Unauthorized. Please log in again.");
-      }
-
-      if (response.status === 403) {
-        throw new Error("Admin privileges required.");
-      }
-
-      if (!response.ok) throw new Error("Failed to approve user");
-
-      // Refresh data
-      await fetchAllUsers();
-      await fetchPendingUsers();
-
-      alert("User approved successfully!");
-    } catch (err) {
-      alert("Error approving user: " + err.message);
-    }
-  };
-
-  // ✅ Reject user
-  const handleReject = async (userId) => {
-    if (!window.confirm("Are you sure you want to reject this user?")) return;
-
-    try {
-      const response = await fetch(`${API_BASE}/reject-user/${userId}/`, {
-        method: "DELETE",
-        headers: getAuthHeaders(),
-      });
-
-      if (response.status === 401) {
-        throw new Error("Unauthorized. Please log in again.");
-      }
-
-      if (response.status === 403) {
-        throw new Error("Admin privileges required.");
-      }
-
-      if (!response.ok) throw new Error("Failed to reject user");
-
-      await fetchAllUsers();
-      await fetchPendingUsers();
-
-      alert("User rejected successfully!");
-    } catch (err) {
-      alert("Error rejecting user: " + err.message);
-    }
-  };
-
-  // ✅ Status badge - updated to remove rejected
-  const getStatusBadge = (user) => {
-    // Determine status based on multiple fields
-    let status = user.status;
-    if (!status) {
-      status = user.is_approved ? "approved" : "pending";
-    }
-
-    const statusStyles = {
-      pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
-      approved: "bg-green-100 text-green-800 border-green-200",
-    };
-
-    // If status is rejected, default to pending display
-    const displayStatus = status === "rejected" ? "pending" : status;
-
-    return (
-      <span
-        className={`px-3 py-1 rounded-full text-xs font-medium border ${
-          statusStyles[displayStatus] || "bg-gray-100 text-gray-800 border-gray-200"
-        }`}
-      >
-        {displayStatus?.charAt(0).toUpperCase() + displayStatus?.slice(1)}
-      </span>
-    );
-  };
-
-  // ✅ Filter users - updated to remove rejected
-  const getFilteredUsers = () => {
-    switch (activeTab) {
-      case "pending":
-        return pendingUsers;
-        
-      case "approved":
-        // Create a set of pending user IDs
-        const pendingUserIds = new Set(pendingUsers.map(p => p.id));
-        
-        // Show all users that are NOT in the pending list
-        return users.filter(user => !pendingUserIds.has(user.id));
-        
-      default: // "all" tab
-        return users;
-    }
-  };
-
-  const filteredUsers = getFilteredUsers();
-
-  // ✅ Loading component
-  const LoadingSpinner = () => (
-    <div className="p-8 text-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-      <p className="mt-2 text-gray-600">Loading users...</p>
-    </div>
-  );
-
-  // ✅ Error message component
-  const ErrorMessage = () => (
-    <div className="p-8 text-center">
-      <div className="text-red-600 mb-4 p-4 bg-red-50 rounded-lg border border-red-200">
-        <strong>Error:</strong> {error}
-      </div>
-      <div className="space-x-4">
-        <button
-          onClick={() => window.location.reload()}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Retry
-        </button>
-        <button
-          onClick={() => window.location.href = "/login-admin"}
-          className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
-        >
-          Go to Admin Login
-        </button>
-      </div>
-    </div>
-  );
-
-  // ✅ Empty state
-  const EmptyState = () => (
-    <div className="text-center py-12">
-      <div className="text-gray-400 mb-4">
-        <svg
-          className="mx-auto h-16 w-16"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1}
-            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
-          />
-        </svg>
-      </div>
-      <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
-      <p className="text-gray-500">There are no users in this category.</p>
-    </div>
-  );
-
-  // ✅ User card - Updated to include profile view button
-  const UserCard = ({ user }) => {
-    const isPending = user.status === "pending" || !user.is_approved;
-    
-    return (
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
-            <div 
-              className="flex-shrink-0 h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center cursor-pointer hover:from-blue-600 hover:to-purple-700 transition-all"
-              onClick={() => handleViewProfile(user.id)}
-              title="View profile"
-            >
-              <span className="text-white font-medium text-lg">
-                {user.username?.charAt(0).toUpperCase() || 'U'}
-              </span>
-            </div>
-            <div className="ml-4">
-              <button
-                onClick={() => handleViewProfile(user.id)}
-                className="text-lg font-semibold text-gray-900 hover:text-blue-600 hover:underline text-left"
-              >
-                {user.username || 'Unknown User'}
-              </button>
-              <p className="text-sm text-gray-500">{user.email}</p>
-            </div>
-          </div>
-          {getStatusBadge(user)}
-        </div>
-
-        <div className="space-y-2 text-sm text-gray-600 mb-4">
-          <div className="flex items-center">
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            Registered: {new Date(user.date_joined).toLocaleDateString()}
-          </div>
-          <button
-            onClick={() => handleViewProfile(user.id)}
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
-          >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            View Full Profile
-          </button>
-        </div>
-
-        <div className="flex space-x-3">
-          {isPending ? (
-            <>
-              <button
-                onClick={() => handleApprove(user.id)}
-                className="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors"
-              >
-                Approve
-              </button>
-              <button
-                onClick={() => handleReject(user.id)}
-                className="flex-1 bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors"
-              >
-                Reject
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => handleReject(user.id)}
-              className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 transition-colors"
-            >
-              Delete
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // ✅ User table row - Updated to include profile view button
-  const UserTableRow = ({ user }) => {
-    // Check if this user is in the pendingUsers array
-    const isInPendingList = pendingUsers.some(pendingUser => pendingUser.id === user.id);
-    
-    return (
-      <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-        <td className="px-6 py-4 whitespace-nowrap">
-          <div className="flex items-center">
-            <div 
-              className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center cursor-pointer hover:from-blue-600 hover:to-purple-700 transition-all"
-              onClick={() => handleViewProfile(user.id)}
-              title="View profile"
-            >
-              <span className="text-white font-medium">
-                {user.username?.charAt(0).toUpperCase() || 'U'}
-              </span>
-            </div>
-            <div className="ml-4">
-              <button
-                onClick={() => handleViewProfile(user.id)}
-                className="text-sm font-semibold text-gray-900 hover:text-blue-600 hover:underline text-left"
-              >
-                {user.username || 'Unknown User'}
-              </button>
-              <div className="text-sm text-gray-500">
-                {user.email}
-              </div>
-            </div>
-          </div>
-        </td>
-        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-          <div className="flex space-x-2">
-            <button
-              onClick={() => handleViewProfile(user.id)}
-              className="text-blue-600 hover:text-blue-900 transition-colors px-2 py-1 rounded hover:bg-blue-50"
-              title="View profile"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-            </button>
-            {isInPendingList ? (
-              <>
-                <button
-                  onClick={() => handleApprove(user.id)}
-                  className="bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700 transition-colors text-xs"
-                >
-                  Approve
-                </button>
-                <button
-                  onClick={() => handleReject(user.id)}
-                  className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 transition-colors text-xs"
-                >
-                  Reject
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => handleReject(user.id)}
-                className="text-red-600 hover:text-red-900 transition-colors"
-              >
-                Delete
-              </button>
-            )}
-          </div>
-        </td>
-      </tr>
-    );
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 mt-20 lg:p-8">
-      {/* User Profile Popup */}
-      <UserProfilePopup 
-        userId={selectedUserId}
-        isOpen={showUserProfile}
-        onClose={handleCloseUserProfile}
-      />
-
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl font-bold text-center mb-8 text-gray-900">
-          User Management Dashboard
-        </h1>
-
-        {/* Debug button - remove in production */}
-        <button 
-          onClick={debugAuth}
-          className="fixed top-4 right-4 bg-gray-800 text-white px-3 py-1 rounded text-xs opacity-50 hover:opacity-100"
-          title="Debug Auth"
-        >
-          🔍 Debug
-        </button>
-
-        {/* Tabs with Icons - Updated to 3 tabs */}
-        <div className="bg-white rounded-xl shadow-sm mb-6 border border-gray-200">
-          <nav className="flex -mb-px">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? "border-blue-500 text-blue-600 bg-blue-50"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                <div className="flex items-center justify-center space-x-2">
-                  <span className="text-lg">{tab.icon}</span>
-                  <span>{tab.name}</span>
-                  {tab.count > 0 && (
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      activeTab === tab.id 
-                        ? "bg-blue-100 text-blue-600" 
-                        : "bg-gray-100 text-gray-600"
-                    }`}>
-                      {tab.count}
-                    </span>
-                  )}
-                </div>
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        {/* Content */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          {loading ? (
-            <LoadingSpinner />
-          ) : error ? (
-            <ErrorMessage />
-          ) : filteredUsers.length > 0 ? (
-            <div className="p-6">
-              {activeTab === "pending" ? (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredUsers.map((user) => (
-                    <UserCard key={user.id} user={user} />
-                  ))}
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredUsers.map((user) => (
-                        <UserTableRow key={user.id} user={user} />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          ) : (
-            <EmptyState />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default AdminDashboard;
+import React, { useState, useEffect } from "react";// User Profile Popup Componentconst UserProfilePopup = ({ userId, isOpen, onClose }) => {  const [userProfile, setUserProfile] = useState(null);  const [loading, setLoading] = useState(false);  const [error, setError] = useState('');  const fetchUserProfile = async () => {    if (!userId) return;    try {      setLoading(true);      setError('');      const token = localStorage.getItem('access');      if (!token) {         setError('Please log in to view user profile');        setLoading(false);        return;      }      const response = await fetch(`http://localhost:8000/api/user-profile/${userId}/`, {        headers: {          'Authorization': `Bearer ${token}`,          'Content-Type': 'application/json'        }      });      if (!response.ok) {        throw new Error('Failed to load user profile');      }      const data = await response.json();      setUserProfile(data);    } catch (err) {      setError('Failed to load user profile. Please try again.');    } finally {      setLoading(false);    }  };  useEffect(() => {    if (isOpen && userId) {      fetchUserProfile();    }  }, [isOpen, userId]);  if (!isOpen) return null;  return (    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/25 bg-opacity-50 mt-16">      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden">        {/* Header */}        <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4">          <div className="flex items-center justify-between">            <h2 className="text-xl font-bold text-white">User Profile</h2>            <button              onClick={onClose}              className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-1 transition-colors duration-200"            >              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />              </svg>            </button>          </div>        </div>        {/* Body */}        <div className="p-6 max-h-[60vh] overflow-y-auto">          {loading && (            <div className="flex flex-col items-center justify-center py-8">              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>              <p className="text-gray-600">Loading profile...</p>            </div>          )}          {error && (            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">              <div className="flex items-center">                <svg className="w-5 h-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />                </svg>                <p className="text-red-800 font-medium">Error</p>              </div>              <p className="text-red-600 mt-1 text-sm">{error}</p>              <button                onClick={fetchUserProfile}                className="mt-3 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200"              >                Try Again              </button>            </div>          )}          {userProfile && !loading && (            <div className="space-y-4">              {/* Profile Header */}              <div className="flex items-center space-x-4 mb-6">                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-xl font-bold">                  {(userProfile.full_name?.charAt(0) || userProfile.username?.charAt(0) || 'U').toUpperCase()}                </div>                <div>                  <h3 className="text-lg font-bold text-gray-900">                    {userProfile.full_name || userProfile.username || 'Unknown User'}                  </h3>                  <p className="text-gray-600 text-sm">{userProfile.email}</p>                </div>              </div>              {/* Profile Fields */}              <div className="space-y-3">                <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-gray-100">                  <span className="text-sm font-medium text-gray-500 mb-1 sm:mb-0 sm:w-1/3">Full Name</span>                  <span className="text-gray-900 font-medium text-sm sm:w-2/3 sm:text-right break-words">                    {userProfile.full_name || 'Not provided'}                  </span>                </div>                <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-gray-100">                  <span className="text-sm font-medium text-gray-500 mb-1 sm:mb-0 sm:w-1/3">Username</span>                  <span className="text-gray-900 font-medium text-sm sm:w-2/3 sm:text-right break-words">                    {userProfile.username || 'Not provided'}                  </span>                </div>                <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-gray-100">                  <span className="text-sm font-medium text-gray-500 mb-1 sm:mb-0 sm:w-1/3">Email</span>                  <span className="text-gray-900 font-medium text-sm sm:w-2/3 sm:text-right break-words">                    {userProfile.email || 'Not provided'}                  </span>                </div>                <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-gray-100">                  <span className="text-sm font-medium text-gray-500 mb-1 sm:mb-0 sm:w-1/3">Phone Number</span>                  <span className="text-gray-900 font-medium text-sm sm:w-2/3 sm:text-right break-words">                    {userProfile.phone_number || 'Not provided'}                  </span>                </div>                <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-gray-100">                  <span className="text-sm font-medium text-gray-500 mb-1 sm:mb-0 sm:w-1/3">College/Company</span>                  <span className="text-gray-900 font-medium text-sm sm:w-2/3 sm:text-right break-words">                    {userProfile.college_company || 'Not provided'}                  </span>                </div>                <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-gray-100">                  <span className="text-sm font-medium text-gray-500 mb-1 sm:mb-0 sm:w-1/3">Address</span>                  <span className="text-gray-900 font-medium text-sm sm:w-2/3 sm:text-right break-words">                    {userProfile.address || 'Not provided'}                  </span>                </div>                {/* Role and Status in grid */}                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">                  <div>                    <span className="text-sm font-medium text-gray-500 block mb-1">Role</span>                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${                      userProfile.role === 'admin'                         ? 'bg-purple-100 text-purple-800'                         : userProfile.role === 'staff'                        ? 'bg-blue-100 text-blue-800'                        : 'bg-green-100 text-green-800'                    }`}>                      {userProfile.role || 'user'}                    </span>                  </div>                  <div>                    <span className="text-sm font-medium text-gray-500 block mb-1">Status</span>                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${                      userProfile.is_approved                         ? 'bg-green-100 text-green-800'                         : 'bg-yellow-100 text-yellow-800'                    }`}>                      {userProfile.is_approved ? 'Approved' : 'Pending'}                    </span>                  </div>                </div>                {/* Member since */}                <div className="bg-gray-50 rounded-lg p-4 mt-4">                  <div className="flex items-center text-sm text-gray-600">                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">                      <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />                    </svg>                    Member since {userProfile.date_joined ? new Date(userProfile.date_joined).toLocaleDateString() : 'Unknown'}                  </div>                </div>              </div>            </div>          )}        </div>        {/* Footer */}        <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">          <div className="flex justify-end">            <button              onClick={onClose}              className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"            >              Close            </button>          </div>        </div>      </div>    </div>  );};const AdminDashboard = () => {  const [activeTab, setActiveTab] = useState("all");  const [users, setUsers] = useState([]);  const [pendingUsers, setPendingUsers] = useState([]);  const [loading, setLoading] = useState(true);  const [error, setError] = useState("");  const [stats, setStats] = useState({    total: 0,    pending: 0,    approved: 0,  });  // New state for user profile popup  const [showUserProfile, setShowUserProfile] = useState(false);  const [selectedUserId, setSelectedUserId] = useState(null);  const API_BASE = "http://127.0.0.1:8000/api/auth";  const tabs = [    { id: "all", name: "All Users", count: stats.total, icon: "👥" },    { id: "pending", name: "Pending", count: stats.pending, icon: "⏳" },    { id: "approved", name: "Approved", count: stats.approved, icon: "✅" },  ];  // 🔐 Debug function to check authentication  const debugAuth = () => {    const user = JSON.parse(localStorage.getItem("user") || "{}");    const token = localStorage.getItem("access");  };  // 🔐 Get token from localStorage with debug info  const getAuthHeaders = () => {    const token = localStorage.getItem("access");    return {      "Content-Type": "application/json",      Authorization: token ? `Bearer ${token}` : "",    };  };  // Handler for viewing user profile  const handleViewProfile = (userId) => {    setSelectedUserId(userId);    setShowUserProfile(true);  };  // Close user profile popup  const handleCloseUserProfile = () => {    setShowUserProfile(false);    setSelectedUserId(null);  };  // ✅ Fetch all users with better error handling  const fetchAllUsers = async () => {    try {      debugAuth(); // Debug info      const response = await fetch(`${API_BASE}/users/`, {        headers: getAuthHeaders(),      });      if (response.status === 401) {        // Clear invalid token and redirect        localStorage.removeItem("access");        localStorage.removeItem("refresh");        localStorage.removeItem("user");        throw new Error("Session expired. Please log in again.");      }      if (response.status === 403) {        throw new Error("Access denied. Admin privileges required.");      }      if (!response.ok) {        throw new Error(`Failed to fetch users: ${response.status} ${response.statusText}`);      }      const data = await response.json();      setUsers(data);      calculateStats(data);    } catch (err) {      setError(err.message);      // Redirect to admin login if unauthorized      if (err.message.includes("Session expired") || err.message.includes("Access denied")) {        setTimeout(() => {          window.location.href = "/login-admin";        }, 3000);      }    }  };  // ✅ Fetch pending users with better error handling  const fetchPendingUsers = async () => {    try {      const response = await fetch(`${API_BASE}/pending-users/`, {        headers: getAuthHeaders(),      });      const data = await response.json();      const pendingList = data.users || data;      setPendingUsers(pendingList);      // Update just the pending count in stats      setStats(prevStats => ({        ...prevStats,        pending: pendingList.length      }));    } catch (err) {      setError(err.message);    }  };  // ✅ Calculate statistics  const calculateStats = (userData) => {    const stats = {      total: userData.length,      pending: 0, // Temporary, will be updated by fetchPendingUsers      approved: userData.filter((user) => user.status === "approved" || user.is_approved).length,    };    setStats(stats);  };  // ✅ Load initial data  useEffect(() => {    const loadData = async () => {      setLoading(true);      setError("");      try {        await Promise.all([fetchAllUsers(), fetchPendingUsers()]);      } catch (err) {        setError("Failed to load dashboard data: " + err.message);      } finally {        setLoading(false);      }    };    loadData();  }, []);  // ✅ Approve user  const handleApprove = async (userId) => {    try {      const response = await fetch(`${API_BASE}/approve-user/${userId}/`, {        method: "POST",        headers: getAuthHeaders(),      });      if (response.status === 401) {        throw new Error("Unauthorized. Please log in again.");      }      if (response.status === 403) {        throw new Error("Admin privileges required.");      }      if (!response.ok) throw new Error("Failed to approve user");      // Refresh data      await fetchAllUsers();      await fetchPendingUsers();      alert("User approved successfully!");    } catch (err) {      alert("Error approving user: " + err.message);    }  };  // ✅ Reject user  const handleReject = async (userId) => {    if (!window.confirm("Are you sure you want to reject this user?")) return;    try {      const response = await fetch(`${API_BASE}/reject-user/${userId}/`, {        method: "DELETE",        headers: getAuthHeaders(),      });      if (response.status === 401) {        throw new Error("Unauthorized. Please log in again.");      }      if (response.status === 403) {        throw new Error("Admin privileges required.");      }      if (!response.ok) throw new Error("Failed to reject user");      await fetchAllUsers();      await fetchPendingUsers();      alert("User rejected successfully!");    } catch (err) {      alert("Error rejecting user: " + err.message);    }  };  // ✅ Status badge - updated to remove rejected  const getStatusBadge = (user) => {    // Determine status based on multiple fields    let status = user.status;    if (!status) {      status = user.is_approved ? "approved" : "pending";    }    const statusStyles = {      pending: "bg-yellow-100 text-yellow-800 border-yellow-200",      approved: "bg-green-100 text-green-800 border-green-200",    };    // If status is rejected, default to pending display    const displayStatus = status === "rejected" ? "pending" : status;    return (      <span        className={`px-3 py-1 rounded-full text-xs font-medium border ${          statusStyles[displayStatus] || "bg-gray-100 text-gray-800 border-gray-200"        }`}      >        {displayStatus?.charAt(0).toUpperCase() + displayStatus?.slice(1)}      </span>    );  };  // ✅ Filter users - updated to remove rejected  const getFilteredUsers = () => {    switch (activeTab) {      case "pending":        return pendingUsers;      case "approved":        // Create a set of pending user IDs        const pendingUserIds = new Set(pendingUsers.map(p => p.id));        // Show all users that are NOT in the pending list        return users.filter(user => !pendingUserIds.has(user.id));      default: // "all" tab        return users;    }  };  const filteredUsers = getFilteredUsers();  // ✅ Loading component  const LoadingSpinner = () => (    <div className="p-8 text-center">      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>      <p className="mt-2 text-gray-600">Loading users...</p>    </div>  );  // ✅ Error message component  const ErrorMessage = () => (    <div className="p-8 text-center">      <div className="text-red-600 mb-4 p-4 bg-red-50 rounded-lg border border-red-200">        <strong>Error:</strong> {error}      </div>      <div className="space-x-4">        <button          onClick={() => window.location.reload()}          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"        >          Retry        </button>        <button          onClick={() => window.location.href = "/login-admin"}          className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"        >          Go to Admin Login        </button>      </div>    </div>  );  // ✅ Empty state  const EmptyState = () => (    <div className="text-center py-12">      <div className="text-gray-400 mb-4">        <svg          className="mx-auto h-16 w-16"          fill="none"          stroke="currentColor"          viewBox="0 0 24 24"        >          <path            strokeLinecap="round"            strokeLinejoin="round"            strokeWidth={1}            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"          />        </svg>      </div>      <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>      <p className="text-gray-500">There are no users in this category.</p>    </div>  );  // ✅ User card - Updated to include profile view button  const UserCard = ({ user }) => {    const isPending = user.status === "pending" || !user.is_approved;    return (      <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow">        <div className="flex items-center justify-between mb-4">          <div className="flex items-center">            <div               className="flex-shrink-0 h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center cursor-pointer hover:from-blue-600 hover:to-purple-700 transition-all"              onClick={() => handleViewProfile(user.id)}              title="View profile"            >              <span className="text-white font-medium text-lg">                {user.username?.charAt(0).toUpperCase() || 'U'}              </span>            </div>            <div className="ml-4">              <button                onClick={() => handleViewProfile(user.id)}                className="text-lg font-semibold text-gray-900 hover:text-blue-600 hover:underline text-left"              >                {user.username || 'Unknown User'}              </button>              <p className="text-sm text-gray-500">{user.email}</p>            </div>          </div>          {getStatusBadge(user)}        </div>        <div className="space-y-2 text-sm text-gray-600 mb-4">          <div className="flex items-center">            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />            </svg>            Registered: {new Date(user.date_joined).toLocaleDateString()}          </div>          <button            onClick={() => handleViewProfile(user.id)}            className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"          >            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />            </svg>            View Full Profile          </button>        </div>        <div className="flex space-x-3">          {isPending ? (            <>              <button                onClick={() => handleApprove(user.id)}                className="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors"              >                Approve              </button>              <button                onClick={() => handleReject(user.id)}                className="flex-1 bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors"              >                Reject              </button>            </>          ) : (            <button              onClick={() => handleReject(user.id)}              className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 transition-colors"            >              Delete            </button>          )}        </div>      </div>    );  };  // ✅ User table row - Updated to include profile view button  const UserTableRow = ({ user }) => {    // Check if this user is in the pendingUsers array    const isInPendingList = pendingUsers.some(pendingUser => pendingUser.id === user.id);    return (      <tr key={user.id} className="hover:bg-gray-50 transition-colors">        <td className="px-6 py-4 whitespace-nowrap">          <div className="flex items-center">            <div               className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center cursor-pointer hover:from-blue-600 hover:to-purple-700 transition-all"              onClick={() => handleViewProfile(user.id)}              title="View profile"            >              <span className="text-white font-medium">                {user.username?.charAt(0).toUpperCase() || 'U'}              </span>            </div>            <div className="ml-4">              <button                onClick={() => handleViewProfile(user.id)}                className="text-sm font-semibold text-gray-900 hover:text-blue-600 hover:underline text-left"              >                {user.username || 'Unknown User'}              </button>              <div className="text-sm text-gray-500">                {user.email}              </div>            </div>          </div>        </td>        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">          <div className="flex space-x-2">            <button              onClick={() => handleViewProfile(user.id)}              className="text-blue-600 hover:text-blue-900 transition-colors px-2 py-1 rounded hover:bg-blue-50"              title="View profile"            >              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />              </svg>            </button>            {isInPendingList ? (              <>                <button                  onClick={() => handleApprove(user.id)}                  className="bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700 transition-colors text-xs"                >                  Approve                </button>                <button                  onClick={() => handleReject(user.id)}                  className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 transition-colors text-xs"                >                  Reject                </button>              </>            ) : (              <button                onClick={() => handleReject(user.id)}                className="text-red-600 hover:text-red-900 transition-colors"              >                Delete              </button>            )}          </div>        </td>      </tr>    );  };  return (    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 mt-20 lg:p-8">      {/* User Profile Popup */}      <UserProfilePopup         userId={selectedUserId}        isOpen={showUserProfile}        onClose={handleCloseUserProfile}      />      <div className="max-w-7xl mx-auto">        <h1 className="text-4xl font-bold text-center mb-8 text-gray-900">          User Management Dashboard        </h1>        {/* Debug button - remove in production */}        <button           onClick={debugAuth}          className="fixed top-4 right-4 bg-gray-800 text-white px-3 py-1 rounded text-xs opacity-50 hover:opacity-100"          title="Debug Auth"        >          🔍 Debug        </button>        {/* Tabs with Icons - Updated to 3 tabs */}        <div className="bg-white rounded-xl shadow-sm mb-6 border border-gray-200">          <nav className="flex -mb-px">            {tabs.map((tab) => (              <button                key={tab.id}                onClick={() => setActiveTab(tab.id)}                className={`flex-1 py-4 px-6 text-center border-b-2 font-medium text-sm transition-colors ${                  activeTab === tab.id                    ? "border-blue-500 text-blue-600 bg-blue-50"                    : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"                }`}              >                <div className="flex items-center justify-center space-x-2">                  <span className="text-lg">{tab.icon}</span>                  <span>{tab.name}</span>                  {tab.count > 0 && (                    <span className={`px-2 py-1 rounded-full text-xs ${                      activeTab === tab.id                         ? "bg-blue-100 text-blue-600"                         : "bg-gray-100 text-gray-600"                    }`}>                      {tab.count}                    </span>                  )}                </div>              </button>            ))}          </nav>        </div>        {/* Content */}        <div className="bg-white rounded-xl shadow-sm border border-gray-200">          {loading ? (            <LoadingSpinner />          ) : error ? (            <ErrorMessage />          ) : filteredUsers.length > 0 ? (            <div className="p-6">              {activeTab === "pending" ? (                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">                  {filteredUsers.map((user) => (                    <UserCard key={user.id} user={user} />                  ))}                </div>              ) : (                <div className="overflow-x-auto">                  <table className="min-w-full divide-y divide-gray-200">                    <thead className="bg-gray-50">                      <tr>                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>                      </tr>                    </thead>                    <tbody className="bg-white divide-y divide-gray-200">                      {filteredUsers.map((user) => (                        <UserTableRow key={user.id} user={user} />                      ))}                    </tbody>                  </table>                </div>              )}            </div>          ) : (            <EmptyState />          )}        </div>      </div>    </div>  );};export default AdminDashboard;

@@ -1,8 +1,6 @@
-
 // import React, { useState, useCallback, useEffect } from "react";
 // import axios from "axios";
 // import { useNavigate } from "react-router-dom";
-
 // // Fixed Password Input Component - Defined outside or with useCallback
 // const PasswordInput = React.memo(({ 
 //   name, 
@@ -44,18 +42,15 @@
 //         </svg>
 //       )}
 //     </button>
-    
 //     {/* Password strength indicator for main password field only */}
 //     {showStrength && passwordStrength && (
 //       <p className={`text-sm mt-1 ${getPasswordStrengthColor(passwordStrength)}`}>
 //         Strength: {passwordStrength}
 //       </p>
 //     )}
-    
 //     {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
 //   </div>
 // ));
-
 // // OTP Input Component
 // const OTPInput = ({ value, onChange, onResend, timeLeft, canResend }) => {
 //   const handleChange = (e) => {
@@ -64,7 +59,6 @@
 //       onChange(val);
 //     }
 //   };
-
 //   return (
 //     <div className="space-y-4">
 //       <div>
@@ -105,7 +99,6 @@
 //     </div>
 //   );
 // };
-
 // // Success Message Component
 // const SuccessMessage = ({ email, onLogin }) => (
 //   <div className="text-center space-y-6 py-8">
@@ -135,7 +128,6 @@
 //     </button>
 //   </div>
 // );
-
 // // Helper function outside component
 // const getPasswordStrengthColor = (strength) => {
 //   switch (strength) {
@@ -146,10 +138,8 @@
 //     default: return "text-gray-600";
 //   }
 // };
-
 // function Register({ onClose, onSwitchToLogin }) {
 //   const navigate = useNavigate();
-
 //   // States for different steps
 //   const [step, setStep] = useState(1); // 1: Registration Form, 2: OTP Verification, 3: Success
 //   const [email, setEmail] = useState("");
@@ -158,7 +148,6 @@
 //   const [canResend, setCanResend] = useState(true);
 //   const [otpError, setOtpError] = useState("");
 //   const [otpLoading, setOtpLoading] = useState(false);
-
 //   const [formData, setFormData] = useState({
 //     full_name: "",
 //     username: "",
@@ -169,13 +158,11 @@
 //     password: "",
 //     password2: "",
 //   });
-
 //   const [errors, setErrors] = useState({});
 //   const [loading, setLoading] = useState(false);
 //   const [showPassword, setShowPassword] = useState(false);
 //   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 //   const [passwordStrength, setPasswordStrength] = useState("");
-
 //   // Timer for OTP expiration
 //   useEffect(() => {
 //     let timer;
@@ -186,26 +173,21 @@
 //     }
 //     return () => clearInterval(timer);
 //   }, [step, timeLeft]);
-
 //   // Use useCallback to prevent unnecessary re-renders
 //   const handleChange = useCallback((e) => {
 //     const { name, value } = e.target;
-    
 //     // Apply input masking/filtering based on field type
 //     let processedValue = value;
-    
 //     if (name === "full_name") {
 //       // Allow only letters, spaces, dots, and hyphens for full name
 //       processedValue = value.replace(/[^A-Za-z\s.-]/g, '');
 //       // Prevent multiple spaces
 //       processedValue = processedValue.replace(/\s+/g, ' ');
 //     }
-    
 //     if (name === "username") {
 //       // Allow only letters, numbers, underscores, and dots for username
 //       processedValue = value.replace(/[^a-zA-Z0-9_.]/g, '');
 //     }
-    
 //     if (name === "phone_number") {
 //       // Format phone number to start with + and only allow digits after
 //       if (value && !value.startsWith('+')) {
@@ -218,14 +200,11 @@
 //         processedValue = processedValue.slice(0, 15);
 //       }
 //     }
-    
 //     setFormData(prev => ({ ...prev, [name]: processedValue }));
-    
 //     // Clear error when user starts typing
 //     if (errors[name]) {
 //       setErrors(prev => ({ ...prev, [name]: "" }));
 //     }
-
 //     // Real-time password strength feedback
 //     if (name === "password") {
 //       if (value.length === 0) {
@@ -238,9 +217,7 @@
 //         const hasLower = /[a-z]/.test(value);
 //         const hasNumber = /[0-9]/.test(value);
 //         const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value);
-        
 //         const strengthCount = [hasUpper, hasLower, hasNumber, hasSpecial].filter(Boolean).length;
-        
 //         if (strengthCount === 4) {
 //           setPasswordStrength("Strong");
 //         } else if (strengthCount >= 2) {
@@ -250,23 +227,19 @@
 //         }
 //       }
 //     }
-
 //     // Update email state for later use
 //     if (name === "email") {
 //       setEmail(value);
 //     }
 //   }, [errors]);
-
 //   // Memoized input className function
 //   const getInputClassName = useCallback((fieldName) => {
 //     return `w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors ${
 //       errors[fieldName] ? "border-red-500" : "border-gray-300"
 //     }`;
 //   }, [errors]);
-
 //   const validateForm = () => {
 //     const newErrors = {};
-
 //     // Full Name validation
 //     if (!formData.full_name.trim()) {
 //       newErrors.full_name = "Full name is required";
@@ -279,7 +252,6 @@
 //     } else if (/\s{2,}/.test(formData.full_name)) {
 //       newErrors.full_name = "Full name cannot contain multiple consecutive spaces";
 //     }
-
 //     // Username validation
 //     if (!formData.username.trim()) {
 //       newErrors.username = "Username is required";
@@ -294,7 +266,6 @@
 //     } else if (/[._]{2,}/.test(formData.username)) {
 //       newErrors.username = "Username cannot have consecutive underscores or dots";
 //     }
-
 //     // Email validation
 //     if (!formData.email.trim()) {
 //       newErrors.email = "Email is required";
@@ -303,7 +274,6 @@
 //     } else if (formData.email.length > 254) {
 //       newErrors.email = "Email address is too long";
 //     }
-
 //     // Phone Number validation - Make it optional but if provided, validate format
 //     if (formData.phone_number) {
 //       // Check if it starts with + and has 10-15 digits
@@ -311,7 +281,6 @@
 //         newErrors.phone_number = "Please enter a valid phone number with country code (e.g., +1234567890)";
 //       }
 //     }
-
 //     // College/Company validation
 //     if (!formData.college_company.trim()) {
 //       newErrors.college_company = "College/Company is required";
@@ -322,7 +291,6 @@
 //     } else if (!/^[A-Za-z0-9\s&.,'-]+$/.test(formData.college_company)) {
 //       newErrors.college_company = "College/Company name can only contain letters, numbers, spaces, and basic punctuation (&.,'-)";
 //     }
-
 //     // Address validation
 //     if (!formData.address.trim()) {
 //       newErrors.address = "Address is required";
@@ -333,7 +301,6 @@
 //     } else if (!/^[A-Za-z0-9\s,.#\-'()]+$/.test(formData.address)) {
 //       newErrors.address = "Address contains invalid characters";
 //     }
-
 //     // Password validation
 //     if (!formData.password) {
 //       newErrors.password = "Password is required";
@@ -347,7 +314,6 @@
 //       const hasLower = /[a-z]/.test(formData.password);
 //       const hasNumber = /[0-9]/.test(formData.password);
 //       const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(formData.password);
-      
 //       if (!hasUpper) {
 //         newErrors.password = "Password must contain at least one uppercase letter";
 //       } else if (!hasLower) {
@@ -358,33 +324,26 @@
 //         newErrors.password = "Password must contain at least one special character";
 //       }
 //     }
-
 //     // Confirm Password validation
 //     if (!formData.password2) {
 //       newErrors.password2 = "Please confirm your password";
 //     } else if (formData.password !== formData.password2) {
 //       newErrors.password2 = "Passwords do not match";
 //     }
-
 //     setErrors(newErrors);
 //     return Object.keys(newErrors).length === 0;
 //   };
-
 //   const handleClose = () => {
 //     navigate("/");
 //     if (onClose) onClose();
 //   };
-
 //   // Handle initial registration and send OTP
 //   const handleSubmit = async (e) => {
 //     e.preventDefault();
-
 //     if (!validateForm()) {
 //       return;
 //     }
-
 //     setLoading(true);
-
 //     try {
 //       // Prepare data for backend
 //       const submitData = {
@@ -398,9 +357,7 @@
 //         password: formData.password,
 //         password2: formData.password2,
 //       };
-
-//       console.log("Sending data to backend:", submitData);
-
+//       
 //       // Call registration init endpoint to send OTP
 //       const response = await axios.post(
 //         "http://127.0.0.1:8000/api/auth/register/init/",
@@ -410,25 +367,18 @@
 //           timeout: 10000
 //         }
 //       );
-
-//       console.log("Registration init response:", response.data);
-
+//       
 //       // Set email for OTP verification
 //       setEmail(formData.email);
-      
 //       // Move to OTP verification step
 //       setStep(2);
 //       setTimeLeft(60); // Reset timer
-      
 //     } catch (error) {
-//       console.error("Registration error:", error);
-      
+//       
 //       if (error.response && error.response.data) {
-//         console.log("Backend error details:", error.response.data);
-        
+//         
 //         const serverErrors = error.response.data;
 //         const formattedErrors = {};
-        
 //         Object.keys(serverErrors).forEach(key => {
 //           if (Array.isArray(serverErrors[key])) {
 //             formattedErrors[key] = serverErrors[key].join(", ");
@@ -438,9 +388,7 @@
 //             formattedErrors[key] = "Invalid field";
 //           }
 //         });
-        
 //         setErrors(formattedErrors);
-        
 //         const errorMessages = Object.values(formattedErrors).join("\n");
 //         alert(`❌ Registration failed!\n${errorMessages}`);
 //       } else if (error.request) {
@@ -452,19 +400,15 @@
 //       setLoading(false);
 //     }
 //   };
-
 //   // Handle OTP verification
 //   const handleOTPSubmit = async (e) => {
 //     e.preventDefault();
-    
 //     if (!otp || otp.length !== 6) {
 //       setOtpError("Please enter a valid 6-digit OTP");
 //       return;
 //     }
-    
 //     setOtpLoading(true);
 //     setOtpError("");
-    
 //     try {
 //       const response = await axios.post(
 //         "http://127.0.0.1:8000/api/auth/register/verify/",
@@ -477,15 +421,11 @@
 //           timeout: 10000
 //         }
 //       );
-      
-//       console.log("OTP verification response:", response.data);
-      
+//       
 //       // Move to success step
 //       setStep(3);
-      
 //     } catch (error) {
-//       console.error("OTP verification error:", error);
-      
+//       
 //       if (error.response && error.response.data) {
 //         if (error.response.data.error) {
 //           setOtpError(error.response.data.error);
@@ -503,13 +443,10 @@
 //       setOtpLoading(false);
 //     }
 //   };
-
 //   // Handle resend OTP
 //   const handleResendOTP = async () => {
 //     if (!canResend) return;
-    
 //     setCanResend(false);
-    
 //     try {
 //       await axios.post(
 //         "http://127.0.0.1:8000/api/auth/register/resend-otp/",
@@ -519,23 +456,19 @@
 //           timeout: 10000
 //         }
 //       );
-      
 //       // Reset timer
 //       setTimeLeft(60);
 //       setOtpError("");
-      
 //       // Allow resend after 30 seconds
 //       setTimeout(() => {
 //         setCanResend(true);
 //       }, 30000);
-      
 //     } catch (error) {
-//       console.error("Resend OTP error:", error);
+//       
 //       setOtpError("Failed to resend OTP. Please try again.");
 //       setCanResend(true);
 //     }
 //   };
-
 //   // Handle back to registration form
 //   const handleBackToForm = () => {
 //     setStep(1);
@@ -543,7 +476,6 @@
 //     setOtpError("");
 //     setTimeLeft(60);
 //   };
-
 //   // Handle login navigation
 //   const handleLogin = () => {
 //     handleClose();
@@ -553,7 +485,6 @@
 //       navigate("/login");
 //     }
 //   };
-
 //   // Render based on current step
 //   const renderStep = () => {
 //     switch (step) {
@@ -566,7 +497,6 @@
 //             <p className="text-center text-gray-500">
 //               Fill in your details below
 //             </p>
-
 //             {/* Full Name */}
 //             <div>
 //               <input
@@ -580,7 +510,6 @@
 //               />
 //               {errors.full_name && <p className="text-red-500 text-sm mt-1">{errors.full_name}</p>}
 //             </div>
-
 //             {/* Username */}
 //             <div>
 //               <input
@@ -594,7 +523,6 @@
 //               />
 //               {errors.username && <p className="text-red-500 text-sm mt-1">{errors.username}</p>}
 //             </div>
-
 //             {/* Email */}
 //             <div>
 //               <input
@@ -608,7 +536,6 @@
 //               />
 //               {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
 //             </div>
-
 //             {/* Phone Number */}
 //             <div>
 //               <input
@@ -621,7 +548,6 @@
 //               />
 //               {errors.phone_number && <p className="text-red-500 text-sm mt-1">{errors.phone_number}</p>}
 //             </div>
-
 //             {/* College/Company */}
 //             <div>
 //               <input
@@ -635,7 +561,6 @@
 //               />
 //               {errors.college_company && <p className="text-red-500 text-sm mt-1">{errors.college_company}</p>}
 //             </div>
-
 //             {/* Address */}
 //             <div>
 //               <textarea
@@ -649,7 +574,6 @@
 //               />
 //               {errors.address && <p className="text-red-500 text-sm mt-1">{errors.address}</p>}
 //             </div>
-
 //             {/* Password */}
 //             <div>
 //               <PasswordInput
@@ -667,7 +591,6 @@
 //                 Password must be at least 8 characters with uppercase, lowercase, number, and special character
 //               </p>
 //             </div>
-
 //             {/* Confirm Password */}
 //             <div>
 //               <PasswordInput
@@ -682,7 +605,6 @@
 //                 showStrength={false}
 //               />
 //             </div>
-
 //             <button
 //               type="submit"
 //               disabled={loading}
@@ -690,7 +612,6 @@
 //             >
 //               {loading ? "Sending OTP..." : "Register"}
 //             </button>
-
 //             <p className="text-center text-sm text-gray-600">
 //               Already have an account?{" "}
 //               <span
@@ -705,7 +626,6 @@
 //             </p>
 //           </form>
 //         );
-
 //       case 2: // OTP Verification
 //         return (
 //           <div className="space-y-6">
@@ -723,7 +643,6 @@
 //                 ← Back to registration form
 //               </button>
 //             </div>
-
 //             <form onSubmit={handleOTPSubmit} className="space-y-4">
 //               <OTPInput
 //                 value={otp}
@@ -732,11 +651,9 @@
 //                 timeLeft={timeLeft}
 //                 canResend={canResend}
 //               />
-
 //               {otpError && (
 //                 <p className="text-red-500 text-sm text-center">{otpError}</p>
 //               )}
-
 //               <button
 //                 type="submit"
 //                 disabled={otpLoading || otp.length !== 6}
@@ -745,13 +662,11 @@
 //                 {otpLoading ? "Verifying..." : "Verify OTP"}
 //               </button>
 //             </form>
-
 //             <p className="text-xs text-gray-500 text-center">
 //               Didn't receive the code? Check your spam folder or request a new one.
 //             </p>
 //           </div>
 //         );
-
 //       case 3: // Success Message
 //         return (
 //           <SuccessMessage 
@@ -759,12 +674,10 @@
 //             onLogin={handleLogin}
 //           />
 //         );
-
 //       default:
 //         return null;
 //     }
 //   };
-
 //   return (
 //     <div className="fixed inset-0 bg-opacity-50 flex justify-center items-center z-50 p-4">
 //       <div className="bg-white rounded-xl w-full max-w-lg relative max-h-[90vh] overflow-y-auto p-6">
@@ -774,19 +687,15 @@
 //         >
 //           ✖
 //         </button>
-
 //         {renderStep()}
 //       </div>
 //     </div>
 //   );
 // }
-
 // export default Register;
-
 import React, { useState, useCallback, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-
 // Fixed Password Input Component - Defined outside or with useCallback
 const PasswordInput = React.memo(({ 
   name, 
@@ -837,19 +746,16 @@ const PasswordInput = React.memo(({
           </svg>
         )}
       </button>
-      
       {/* Password strength indicator for main password field only */}
       {showStrength && passwordStrength && (
         <p id={`${name}-strength`} className={`text-sm mt-1 ${getPasswordStrengthColor(passwordStrength)}`}>
           Strength: {passwordStrength}
         </p>
       )}
-      
       {error && <p id={`${name}-error`} className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
   </div>
 ));
-
 // OTP Input Component
 const OTPInput = ({ value, onChange, onResend, timeLeft, canResend }) => {
   const handleChange = (e) => {
@@ -858,7 +764,6 @@ const OTPInput = ({ value, onChange, onResend, timeLeft, canResend }) => {
       onChange(val);
     }
   };
-
   return (
     <div className="space-y-4">
       <div className="space-y-1">
@@ -902,7 +807,6 @@ const OTPInput = ({ value, onChange, onResend, timeLeft, canResend }) => {
     </div>
   );
 };
-
 // Success Message Component
 const SuccessMessage = ({ email, onLogin }) => (
   <div className="text-center space-y-6 py-8">
@@ -932,7 +836,6 @@ const SuccessMessage = ({ email, onLogin }) => (
     </button>
   </div>
 );
-
 // Helper function outside component
 const getPasswordStrengthColor = (strength) => {
   switch (strength) {
@@ -943,10 +846,8 @@ const getPasswordStrengthColor = (strength) => {
     default: return "text-gray-600";
   }
 };
-
 function Register({ onClose, onSwitchToLogin }) {
   const navigate = useNavigate();
-
   // States for different steps
   const [step, setStep] = useState(1); // 1: Registration Form, 2: OTP Verification, 3: Success
   const [email, setEmail] = useState("");
@@ -955,7 +856,6 @@ function Register({ onClose, onSwitchToLogin }) {
   const [canResend, setCanResend] = useState(true);
   const [otpError, setOtpError] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
-
   const [formData, setFormData] = useState({
     full_name: "",
     username: "",
@@ -966,13 +866,11 @@ function Register({ onClose, onSwitchToLogin }) {
     password: "",
     password2: "",
   });
-
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState("");
-
   // Timer for OTP expiration
   useEffect(() => {
     let timer;
@@ -983,26 +881,21 @@ function Register({ onClose, onSwitchToLogin }) {
     }
     return () => clearInterval(timer);
   }, [step, timeLeft]);
-
   // Use useCallback to prevent unnecessary re-renders
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
-    
     // Apply input masking/filtering based on field type
     let processedValue = value;
-    
     if (name === "full_name") {
       // Allow only letters, spaces, dots, and hyphens for full name
       processedValue = value.replace(/[^A-Za-z\s.-]/g, '');
       // Prevent multiple spaces
       processedValue = processedValue.replace(/\s+/g, ' ');
     }
-    
     if (name === "username") {
       // Allow only letters, numbers, underscores, and dots for username
       processedValue = value.replace(/[^a-zA-Z0-9_.]/g, '');
     }
-    
     if (name === "phone_number") {
       // Ensure +91 prefix is always present and non-removable
       if (!value.startsWith('+91')) {
@@ -1018,14 +911,11 @@ function Register({ onClose, onSwitchToLogin }) {
         processedValue = processedValue.slice(0, 13);
       }
     }
-    
     setFormData(prev => ({ ...prev, [name]: processedValue }));
-    
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: "" }));
     }
-
     // Real-time password strength feedback
     if (name === "password") {
       if (value.length === 0) {
@@ -1038,9 +928,7 @@ function Register({ onClose, onSwitchToLogin }) {
         const hasLower = /[a-z]/.test(value);
         const hasNumber = /[0-9]/.test(value);
         const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value);
-        
         const strengthCount = [hasUpper, hasLower, hasNumber, hasSpecial].filter(Boolean).length;
-        
         if (strengthCount === 4) {
           setPasswordStrength("Strong");
         } else if (strengthCount >= 2) {
@@ -1050,23 +938,19 @@ function Register({ onClose, onSwitchToLogin }) {
         }
       }
     }
-
     // Update email state for later use
     if (name === "email") {
       setEmail(value);
     }
   }, [errors]);
-
   // Memoized input className function
   const getInputClassName = useCallback((fieldName) => {
     return `w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors ${
       errors[fieldName] ? "border-red-500" : "border-gray-300"
     }`;
   }, [errors]);
-
   const validateForm = () => {
     const newErrors = {};
-
     // Full Name validation
     if (!formData.full_name.trim()) {
       newErrors.full_name = "Full name is required";
@@ -1079,7 +963,6 @@ function Register({ onClose, onSwitchToLogin }) {
     } else if (/\s{2,}/.test(formData.full_name)) {
       newErrors.full_name = "Full name cannot contain multiple consecutive spaces";
     }
-
     // Username validation
     if (!formData.username.trim()) {
       newErrors.username = "Username is required";
@@ -1094,7 +977,6 @@ function Register({ onClose, onSwitchToLogin }) {
     } else if (/[._]{2,}/.test(formData.username)) {
       newErrors.username = "Username cannot have consecutive underscores or dots";
     }
-
     // Email validation
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
@@ -1103,7 +985,6 @@ function Register({ onClose, onSwitchToLogin }) {
     } else if (formData.email.length > 254) {
       newErrors.email = "Email address is too long";
     }
-
     // Phone Number validation - Now required with +91 prefix
     if (!formData.phone_number || formData.phone_number === "+91") {
       newErrors.phone_number = "Phone number is required";
@@ -1112,7 +993,6 @@ function Register({ onClose, onSwitchToLogin }) {
     } else if (formData.phone_number.length !== 13) { // +91 + 10 digits = 13 characters
       newErrors.phone_number = "Phone number must be exactly 10 digits after +91";
     }
-
     // College/Company validation
     if (!formData.college_company.trim()) {
       newErrors.college_company = "College/Company is required";
@@ -1123,7 +1003,6 @@ function Register({ onClose, onSwitchToLogin }) {
     } else if (!/^[A-Za-z0-9\s&.,'-]+$/.test(formData.college_company)) {
       newErrors.college_company = "College/Company name can only contain letters, numbers, spaces, and basic punctuation (&.,'-)";
     }
-
     // Address validation
     if (!formData.address.trim()) {
       newErrors.address = "Address is required";
@@ -1134,7 +1013,6 @@ function Register({ onClose, onSwitchToLogin }) {
     } else if (!/^[A-Za-z0-9\s,.#\-'()]+$/.test(formData.address)) {
       newErrors.address = "Address contains invalid characters";
     }
-
     // Password validation
     if (!formData.password) {
       newErrors.password = "Password is required";
@@ -1148,7 +1026,6 @@ function Register({ onClose, onSwitchToLogin }) {
       const hasLower = /[a-z]/.test(formData.password);
       const hasNumber = /[0-9]/.test(formData.password);
       const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(formData.password);
-      
       if (!hasUpper) {
         newErrors.password = "Password must contain at least one uppercase letter";
       } else if (!hasLower) {
@@ -1159,33 +1036,26 @@ function Register({ onClose, onSwitchToLogin }) {
         newErrors.password = "Password must contain at least one special character";
       }
     }
-
     // Confirm Password validation
     if (!formData.password2) {
       newErrors.password2 = "Please confirm your password";
     } else if (formData.password !== formData.password2) {
       newErrors.password2 = "Passwords do not match";
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-
   const handleClose = () => {
     navigate("/");
     if (onClose) onClose();
   };
-
   // Handle initial registration and send OTP
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!validateForm()) {
       return;
     }
-
     setLoading(true);
-
     try {
       // Prepare data for backend
       const submitData = {
@@ -1199,9 +1069,6 @@ function Register({ onClose, onSwitchToLogin }) {
         password: formData.password,
         password2: formData.password2,
       };
-
-      console.log("Sending data to backend:", submitData);
-
       // Call registration init endpoint to send OTP
       const response = await axios.post(
         "http://127.0.0.1:8000/api/auth/register/init/",
@@ -1211,25 +1078,15 @@ function Register({ onClose, onSwitchToLogin }) {
           timeout: 10000
         }
       );
-
-      console.log("Registration init response:", response.data);
-
       // Set email for OTP verification
       setEmail(formData.email);
-      
       // Move to OTP verification step
       setStep(2);
       setTimeLeft(60); // Reset timer
-      
     } catch (error) {
-      console.error("Registration error:", error);
-      
       if (error.response && error.response.data) {
-        console.log("Backend error details:", error.response.data);
-        
         const serverErrors = error.response.data;
         const formattedErrors = {};
-        
         Object.keys(serverErrors).forEach(key => {
           if (Array.isArray(serverErrors[key])) {
             formattedErrors[key] = serverErrors[key].join(", ");
@@ -1239,9 +1096,7 @@ function Register({ onClose, onSwitchToLogin }) {
             formattedErrors[key] = "Invalid field";
           }
         });
-        
         setErrors(formattedErrors);
-        
         const errorMessages = Object.values(formattedErrors).join("\n");
         alert(`❌ Registration failed!\n${errorMessages}`);
       } else if (error.request) {
@@ -1253,19 +1108,15 @@ function Register({ onClose, onSwitchToLogin }) {
       setLoading(false);
     }
   };
-
   // Handle OTP verification
   const handleOTPSubmit = async (e) => {
     e.preventDefault();
-    
     if (!otp || otp.length !== 6) {
       setOtpError("Please enter a valid 6-digit OTP");
       return;
     }
-    
     setOtpLoading(true);
     setOtpError("");
-    
     try {
       const response = await axios.post(
         "http://127.0.0.1:8000/api/auth/register/verify/",
@@ -1278,15 +1129,9 @@ function Register({ onClose, onSwitchToLogin }) {
           timeout: 10000
         }
       );
-      
-      console.log("OTP verification response:", response.data);
-      
       // Move to success step
       setStep(3);
-      
     } catch (error) {
-      console.error("OTP verification error:", error);
-      
       if (error.response && error.response.data) {
         if (error.response.data.error) {
           setOtpError(error.response.data.error);
@@ -1304,13 +1149,10 @@ function Register({ onClose, onSwitchToLogin }) {
       setOtpLoading(false);
     }
   };
-
   // Handle resend OTP
   const handleResendOTP = async () => {
     if (!canResend) return;
-    
     setCanResend(false);
-    
     try {
       await axios.post(
         "http://127.0.0.1:8000/api/auth/register/resend-otp/",
@@ -1320,23 +1162,18 @@ function Register({ onClose, onSwitchToLogin }) {
           timeout: 10000
         }
       );
-      
       // Reset timer
       setTimeLeft(60);
       setOtpError("");
-      
       // Allow resend after 30 seconds
       setTimeout(() => {
         setCanResend(true);
       }, 30000);
-      
     } catch (error) {
-      console.error("Resend OTP error:", error);
       setOtpError("Failed to resend OTP. Please try again.");
       setCanResend(true);
     }
   };
-
   // Handle back to registration form
   const handleBackToForm = () => {
     setStep(1);
@@ -1344,7 +1181,6 @@ function Register({ onClose, onSwitchToLogin }) {
     setOtpError("");
     setTimeLeft(60);
   };
-
   // Handle login navigation
   const handleLogin = () => {
     handleClose();
@@ -1354,7 +1190,6 @@ function Register({ onClose, onSwitchToLogin }) {
       navigate("/login");
     }
   };
-
   // Render based on current step
   const renderStep = () => {
     switch (step) {
@@ -1369,7 +1204,6 @@ function Register({ onClose, onSwitchToLogin }) {
                 Fill in your details below (<span className="text-red-500">*</span> indicates required field)
               </p>
             </div>
-
             {/* Full Name */}
             <div className="space-y-1">
               <label htmlFor="full_name" className="block text-sm font-medium text-gray-700">
@@ -1390,7 +1224,6 @@ function Register({ onClose, onSwitchToLogin }) {
                 <p id="full_name-error" className="text-red-500 text-sm mt-1">{errors.full_name}</p>
               )}
             </div>
-
             {/* Username */}
             <div className="space-y-1">
               <label htmlFor="username" className="block text-sm font-medium text-gray-700">
@@ -1411,7 +1244,6 @@ function Register({ onClose, onSwitchToLogin }) {
                 <p id="username-error" className="text-red-500 text-sm mt-1">{errors.username}</p>
               )}
             </div>
-
             {/* Email */}
             <div className="space-y-1">
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -1432,7 +1264,6 @@ function Register({ onClose, onSwitchToLogin }) {
                 <p id="email-error" className="text-red-500 text-sm mt-1">{errors.email}</p>
               )}
             </div>
-
             {/* Phone Number - Now required with +91 prefix */}
             <div className="space-y-1">
               <label htmlFor="phone_number" className="block text-sm font-medium text-gray-700">
@@ -1456,7 +1287,6 @@ function Register({ onClose, onSwitchToLogin }) {
                 <p id="phone_number-error" className="text-red-500 text-sm mt-1">{errors.phone_number}</p>
               )}
             </div>
-
             {/* College/Company */}
             <div className="space-y-1">
               <label htmlFor="college_company" className="block text-sm font-medium text-gray-700">
@@ -1477,7 +1307,6 @@ function Register({ onClose, onSwitchToLogin }) {
                 <p id="college_company-error" className="text-red-500 text-sm mt-1">{errors.college_company}</p>
               )}
             </div>
-
             {/* Address */}
             <div className="space-y-1">
               <label htmlFor="address" className="block text-sm font-medium text-gray-700">
@@ -1501,7 +1330,6 @@ function Register({ onClose, onSwitchToLogin }) {
                 <p id="address-error" className="text-red-500 text-sm mt-1">{errors.address}</p>
               )}
             </div>
-
             {/* Password */}
             <PasswordInput
               name="password"
@@ -1518,7 +1346,6 @@ function Register({ onClose, onSwitchToLogin }) {
             <p className="text-xs text-gray-500 -mt-2">
               Password must be at least 8 characters with uppercase, lowercase, number, and special character
             </p>
-
             {/* Confirm Password */}
             <PasswordInput
               name="password2"
@@ -1532,7 +1359,6 @@ function Register({ onClose, onSwitchToLogin }) {
               passwordStrength=""
               showStrength={false}
             />
-
             <button
               type="submit"
               disabled={loading}
@@ -1540,7 +1366,6 @@ function Register({ onClose, onSwitchToLogin }) {
             >
               {loading ? "Sending OTP..." : "Register"}
             </button>
-
             <p className="text-center text-sm text-gray-600 mt-4">
               Already have an account?{" "}
               <span
@@ -1555,7 +1380,6 @@ function Register({ onClose, onSwitchToLogin }) {
             </p>
           </form>
         );
-
       case 2: // OTP Verification
         return (
           <div className="space-y-6">
@@ -1573,7 +1397,6 @@ function Register({ onClose, onSwitchToLogin }) {
                 ← Back to registration form
               </button>
             </div>
-
             <form onSubmit={handleOTPSubmit} className="space-y-4">
               <OTPInput
                 value={otp}
@@ -1582,11 +1405,9 @@ function Register({ onClose, onSwitchToLogin }) {
                 timeLeft={timeLeft}
                 canResend={canResend}
               />
-
               {otpError && (
                 <p className="text-red-500 text-sm text-center">{otpError}</p>
               )}
-
               <button
                 type="submit"
                 disabled={otpLoading || otp.length !== 6}
@@ -1595,13 +1416,11 @@ function Register({ onClose, onSwitchToLogin }) {
                 {otpLoading ? "Verifying..." : "Verify OTP"}
               </button>
             </form>
-
             <p className="text-xs text-gray-500 text-center">
               Didn't receive the code? Check your spam folder or request a new one.
             </p>
           </div>
         );
-
       case 3: // Success Message
         return (
           <SuccessMessage 
@@ -1609,12 +1428,10 @@ function Register({ onClose, onSwitchToLogin }) {
             onLogin={handleLogin}
           />
         );
-
       default:
         return null;
     }
   };
-
   return (
     <div className="fixed inset-0  bg-opacity-50 flex justify-center items-center z-50 p-4">
       <div className="bg-white rounded-xl w-full max-w-lg relative max-h-[90vh] overflow-y-auto p-6 shadow-xl">
@@ -1625,11 +1442,9 @@ function Register({ onClose, onSwitchToLogin }) {
         >
           ✖
         </button>
-
         {renderStep()}
       </div>
     </div>
   );
 }
-
 export default Register;

@@ -1,32 +1,1 @@
-
-
-import { Navigate, useLocation } from "react-router-dom";
-
-const ProtectedRoute = ({ children, allowedRoles = [], requireAdmin = false }) => {
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const token = localStorage.getItem("access");
-  const location = useLocation();
-
-  // Check if user is authenticated
-  if (!token || !user.id) {
-    if (location.pathname.startsWith("/admin")) {
-      return <Navigate to="/login-admin" state={{ from: location }} replace />;
-    } else {
-      return <Navigate to="/login" state={{ from: location }} replace />;
-    }
-  }
-
-  // Check for admin access if required
-  if (requireAdmin && !user.is_staff && !user.is_superuser) {
-    return <Navigate to="/unauthorized" replace />;
-  }
-
-  // Check for specific roles if provided
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/unauthorized" replace />;
-  }
-
-  return children;
-};
-
-export default ProtectedRoute;
+import { Navigate, useLocation } from "react-router-dom";const ProtectedRoute = ({ children, allowedRoles = [], requireAdmin = false }) => {  const user = JSON.parse(localStorage.getItem("user") || "{}");  const token = localStorage.getItem("access");  const location = useLocation();  // Check if user is authenticated  if (!token || !user.id) {    if (location.pathname.startsWith("/admin")) {      return <Navigate to="/login-admin" state={{ from: location }} replace />;    } else {      return <Navigate to="/login" state={{ from: location }} replace />;    }  }  // Check for admin access if required  if (requireAdmin && !user.is_staff && !user.is_superuser) {    return <Navigate to="/unauthorized" replace />;  }  // Check for specific roles if provided  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {    return <Navigate to="/unauthorized" replace />;  }  return children;};export default ProtectedRoute;

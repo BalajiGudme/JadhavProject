@@ -1,28 +1,1 @@
-// utils/auth.js
-export const logout = () => {
-  localStorage.removeItem("user");
-  localStorage.removeItem("token");
-  window.location.href = "/login";
-};
-
-export const getCurrentUser = () => {
-  const user = localStorage.getItem("user");
-  return user ? JSON.parse(user) : null;
-};
-
-export const isAuthenticated = () => {
-  return !!localStorage.getItem("user");
-};
-
-export const hasRole = (role) => {
-  const user = getCurrentUser();
-  return user && user.role === role;
-};
-
-// Helper to redirect based on role after login
-export const getRoleBasedRedirect = () => {
-  const user = getCurrentUser();
-  if (!user) return "/login";
-  
-  return user.role === "admin" ? "/admin/dashboard" : "/";
-};
+// utils/auth.jsexport const logout = () => {  localStorage.removeItem("user");  localStorage.removeItem("token");  window.location.href = "/login";};export const getCurrentUser = () => {  const user = localStorage.getItem("user");  return user ? JSON.parse(user) : null;};export const isAuthenticated = () => {  return !!localStorage.getItem("user");};export const hasRole = (role) => {  const user = getCurrentUser();  return user && user.role === role;};// Helper to redirect based on role after loginexport const getRoleBasedRedirect = () => {  const user = getCurrentUser();  if (!user) return "/login";  return user.role === "admin" ? "/admin/dashboard" : "/";};

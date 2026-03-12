@@ -1,13 +1,1 @@
-import React from 'react';
-
-function Main() {
-  return (
-    <main className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
-      Hiii
-      </div>
-    </main>
-  );
-}
- 
-export default Main;
+import React from 'react';function Main() {  return (    <main className="min-h-screen bg-gray-50 p-6">      <div className="max-w-4xl mx-auto">      Hiii      </div>    </main>  );}export default Main;

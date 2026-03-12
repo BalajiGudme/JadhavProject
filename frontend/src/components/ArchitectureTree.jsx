@@ -1,212 +1,1 @@
-
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-
-const ArchitectureTree = () => {
-  const [treeData, setTreeData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  // Create axios instance with interceptors
-  const api = axios.create({
-    baseURL: '/api',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  // Add request interceptor to include access token
-  api.interceptors.request.use(
-    (config) => {
-      const token = localStorage.getItem('access');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
-    },
-    (error) => {
-      return Promise.reject(error);
-    }
-  );
-
-  // Add response interceptor to handle token refresh
-  api.interceptors.response.use(
-    (response) => {
-      return response;
-    },
-    async (error) => {
-      const originalRequest = error.config;
-
-      if (error.response?.status === 401 && !originalRequest._retry) {
-        originalRequest._retry = true;
-
-        try {
-          const refreshToken = localStorage.getItem('refresh');
-          if (!refreshToken) {
-            // No refresh token, redirect to login
-            redirectToLogin();
-            return Promise.reject(error);
-          }
-
-          // Attempt to refresh the token
-          const response = await axios.post('/api/token/refresh/', {
-            refresh: refreshToken,
-          });
-
-          const newAccessToken = response.data.access;
-          localStorage.setItem('access', newAccessToken);
-
-          // Retry the original request with new token
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-          return api(originalRequest);
-        } catch (refreshError) {
-          // Refresh failed, redirect to login
-          console.error('Token refresh failed:', refreshError);
-          redirectToLogin();
-          return Promise.reject(refreshError);
-        }
-      }
-
-      return Promise.reject(error);
-    }
-  );
-
-  const redirectToLogin = () => {
-    // Clear tokens and redirect to login
-    localStorage.removeItem('access');
-    localStorage.removeItem('refresh');
-    window.location.href = '/login';
-  };
-
-  useEffect(() => {
-    fetchArchitectureTree();
-  }, []);
-
-  const fetchArchitectureTree = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await api.get('/architecture-tree/');
-      setTreeData(response.data);
-    } catch (err) {
-      console.error('Error fetching architecture tree:', err);
-      
-      if (err.response?.status === 401) {
-        setError('Authentication failed. Please login again.');
-      } else if (err.response?.status === 403) {
-        setError('You do not have permission to view this data.');
-      } else {
-        setError('Failed to fetch architecture tree. Please try again.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const renderTreeNode = (node, level = 0) => {
-    const indent = level * 4;
-    
-    return (
-      <div key={node.id} className={`ml-${indent} mb-2`}>
-        <div className={`
-          p-3 border rounded-lg
-          ${level === 0 
-            ? 'bg-blue-50 border-blue-200' 
-            : 'bg-gray-50 border-gray-200'
-          }
-          hover:shadow-md transition-shadow
-        `}>
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <h4 className="font-semibold text-gray-800">
-                {node.name}
-                {node.institution_type && (
-                  <span className="text-blue-600 ml-2">({node.institution_type})</span>
-                )}
-              </h4>
-              
-              {(node.department_name || node.class_name || node.division) && (
-                <p className="text-sm text-gray-600 mt-1">
-                  {node.department_name && `Dept: ${node.department_name}`}
-                  {node.class_name && ` • Class: ${node.class_name}`}
-                  {node.division && ` • Div: ${node.division}`}
-                </p>
-              )}
-              
-              <div className="flex gap-4 mt-2 text-xs text-gray-500">
-                <span>👥 Students: {node.student_count}</span>
-                <span>👨‍🏫 Staff: {node.staff_count}</span>
-              </div>
-            </div>
-            
-            {node.children && node.children.length > 0 && (
-              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
-                {node.children.length} children
-              </span>
-            )}
-          </div>
-        </div>
-        
-        {node.children && (
-          <div className="mt-2">
-            {node.children.map(child => renderTreeNode(child, level + 1))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-800">College/Company Architecture</h2>
-          <button
-            onClick={fetchArchitectureTree}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-          >
-            🔄 Retry
-          </button>
-        </div>
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-800">College/Company Architecture</h2>
-        <button
-          onClick={fetchArchitectureTree}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-        >
-          🔄 Refresh
-        </button>
-      </div>
-      
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        {treeData.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            No architecture data found. Start by creating your first node.
-          </div>
-        ) : (
-          treeData.map(node => renderTreeNode(node))
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default ArchitectureTree;
+import React, { useState, useEffect } from 'react';import axios from 'axios';const ArchitectureTree = () => {  const [treeData, setTreeData] = useState([]);  const [loading, setLoading] = useState(true);  const [error, setError] = useState(null);  // Create axios instance with interceptors  const api = axios.create({    baseURL: '/api',    headers: {      'Content-Type': 'application/json',    },  });  // Add request interceptor to include access token  api.interceptors.request.use(    (config) => {      const token = localStorage.getItem('access');      if (token) {        config.headers.Authorization = `Bearer ${token}`;      }      return config;    },    (error) => {      return Promise.reject(error);    }  );  // Add response interceptor to handle token refresh  api.interceptors.response.use(    (response) => {      return response;    },    async (error) => {      const originalRequest = error.config;      if (error.response?.status === 401 && !originalRequest._retry) {        originalRequest._retry = true;        try {          const refreshToken = localStorage.getItem('refresh');          if (!refreshToken) {            // No refresh token, redirect to login            redirectToLogin();            return Promise.reject(error);          }          // Attempt to refresh the token          const response = await axios.post('/api/token/refresh/', {            refresh: refreshToken,          });          const newAccessToken = response.data.access;          localStorage.setItem('access', newAccessToken);          // Retry the original request with new token          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;          return api(originalRequest);        } catch (refreshError) {          // Refresh failed, redirect to login          redirectToLogin();          return Promise.reject(refreshError);        }      }      return Promise.reject(error);    }  );  const redirectToLogin = () => {    // Clear tokens and redirect to login    localStorage.removeItem('access');    localStorage.removeItem('refresh');    window.location.href = '/login';  };  useEffect(() => {    fetchArchitectureTree();  }, []);  const fetchArchitectureTree = async () => {    try {      setLoading(true);      setError(null);      const response = await api.get('/architecture-tree/');      setTreeData(response.data);    } catch (err) {      if (err.response?.status === 401) {        setError('Authentication failed. Please login again.');      } else if (err.response?.status === 403) {        setError('You do not have permission to view this data.');      } else {        setError('Failed to fetch architecture tree. Please try again.');      }    } finally {      setLoading(false);    }  };  const renderTreeNode = (node, level = 0) => {    const indent = level * 4;    return (      <div key={node.id} className={`ml-${indent} mb-2`}>        <div className={`          p-3 border rounded-lg          ${level === 0             ? 'bg-blue-50 border-blue-200'             : 'bg-gray-50 border-gray-200'          }          hover:shadow-md transition-shadow        `}>          <div className="flex items-start justify-between">            <div className="flex-1">              <h4 className="font-semibold text-gray-800">                {node.name}                {node.institution_type && (                  <span className="text-blue-600 ml-2">({node.institution_type})</span>                )}              </h4>              {(node.department_name || node.class_name || node.division) && (                <p className="text-sm text-gray-600 mt-1">                  {node.department_name && `Dept: ${node.department_name}`}                  {node.class_name && ` • Class: ${node.class_name}`}                  {node.division && ` • Div: ${node.division}`}                </p>              )}              <div className="flex gap-4 mt-2 text-xs text-gray-500">                <span>👥 Students: {node.student_count}</span>                <span>👨‍🏫 Staff: {node.staff_count}</span>              </div>            </div>            {node.children && node.children.length > 0 && (              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">                {node.children.length} children              </span>            )}          </div>        </div>        {node.children && (          <div className="mt-2">            {node.children.map(child => renderTreeNode(child, level + 1))}          </div>        )}      </div>    );  };  if (loading) {    return (      <div className="flex items-center justify-center h-64">        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>      </div>    );  }  if (error) {    return (      <div className="space-y-4">        <div className="flex items-center justify-between">          <h2 className="text-2xl font-bold text-gray-800">College/Company Architecture</h2>          <button            onClick={fetchArchitectureTree}            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"          >            🔄 Retry          </button>        </div>        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">          {error}        </div>      </div>    );  }  return (    <div className="space-y-4">      <div className="flex items-center justify-between">        <h2 className="text-2xl font-bold text-gray-800">College/Company Architecture</h2>        <button          onClick={fetchArchitectureTree}          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"        >          🔄 Refresh        </button>      </div>      <div className="bg-white rounded-lg shadow-sm p-6">        {treeData.length === 0 ? (          <div className="text-center text-gray-500 py-8">            No architecture data found. Start by creating your first node.          </div>        ) : (          treeData.map(node => renderTreeNode(node))        )}      </div>    </div>  );};export default ArchitectureTree;

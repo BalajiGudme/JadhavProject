@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import slide1 from "../assets/images/14.png";
 import slide3 from "../assets/images/g20.jpg";
-import slide4Image from "../assets/images/pc7.jpg";
+import slide4Image from "../assets/images/h2.jpg";
 import AdminLogin from "./Admin/AdminLogin";
 
 // DesktopMonitorSlideshow component
@@ -45,7 +45,6 @@ const DesktopMonitorSlideshow = () => {
     const tokenFromUrl = urlParams.get('token');
     
     if (tokenFromUrl) {
-      console.log('Found token in URL');
       localStorage.setItem('jwt_token', tokenFromUrl);
       return tokenFromUrl;
     }
@@ -56,7 +55,6 @@ const DesktopMonitorSlideshow = () => {
     for (const key of possibleKeys) {
       const token = localStorage.getItem(key) || sessionStorage.getItem(key);
       if (token && token.length > 10) {
-        console.log(`Found token with key: ${key}`);
         return token;
       }
     }
@@ -66,12 +64,10 @@ const DesktopMonitorSlideshow = () => {
     for (const cookie of cookies) {
       const [key, value] = cookie.trim().split('=');
       if (possibleKeys.includes(key) && value && value.length > 10) {
-        console.log(`Found token in cookie: ${key}`);
         return value;
       }
     }
     
-    console.log('No token found in any storage location');
     return null;
   };
 
@@ -122,7 +118,6 @@ const DesktopMonitorSlideshow = () => {
           setApiSlides(fallbackSlides);
         }
       } catch (error) {
-        console.error('Error fetching slides:', error);
         setApiError(`Failed to fetch slides: ${error.message}`);
         setApiSlides(fallbackSlides);
       } finally {
@@ -174,7 +169,6 @@ const DesktopMonitorSlideshow = () => {
           setMonitorSlides(monitorFallbackSlides);
         }
       } catch (error) {
-        console.error('Error fetching monitor slides:', error);
         setMonitorApiError(`Failed to fetch slides: ${error.message}`);
         setMonitorSlides(monitorFallbackSlides);
       } finally {
@@ -339,8 +333,6 @@ const DesktopMonitorSlideshow = () => {
       
       setUploadProgress({ message: 'Uploading images to server...', percent: 30 });
       
-      console.log('Uploading small panel slides with token:', token.substring(0, 20) + '...');
-      
       const response = await fetch(`http://127.0.0.1:8000/api/slide1/1/`, {
         method: 'PATCH',
         headers: {
@@ -350,8 +342,6 @@ const DesktopMonitorSlideshow = () => {
       });
 
       setUploadProgress({ message: 'Processing images...', percent: 60 });
-      
-      console.log('Response status:', response.status);
       
       if (!response.ok) {
         let errorMessage = `HTTP error! Status: ${response.status}`;
@@ -365,7 +355,6 @@ const DesktopMonitorSlideshow = () => {
         // Try to get error details from response
         try {
           const errorData = await response.json();
-          console.error('Error response data:', errorData);
           if (errorData.detail) {
             errorMessage += ` Details: ${errorData.detail}`;
           }
@@ -377,7 +366,6 @@ const DesktopMonitorSlideshow = () => {
       }
 
       const data = await response.json();
-      console.log('Upload successful:', data);
       
       setUploadProgress({ message: 'Updating display...', percent: 90 });
       
@@ -401,7 +389,6 @@ const DesktopMonitorSlideshow = () => {
       }, 1000);
 
     } catch (error) {
-      console.error('Upload error:', error);
       alert(`Upload failed: ${error.message}`);
       
       // Show detailed error info
@@ -448,8 +435,6 @@ const DesktopMonitorSlideshow = () => {
       
       setUploadProgress({ message: 'Uploading images to server...', percent: 30 });
       
-      console.log('Uploading monitor slides with token:', token.substring(0, 20) + '...');
-      
       const response = await fetch(`http://127.0.0.1:8000/api/slide2/1/`, {
         method: 'PATCH',
         headers: {
@@ -459,8 +444,6 @@ const DesktopMonitorSlideshow = () => {
       });
 
       setUploadProgress({ message: 'Processing images...', percent: 60 });
-      
-      console.log('Response status:', response.status);
       
       if (!response.ok) {
         let errorMessage = `HTTP error! Status: ${response.status}`;
@@ -474,7 +457,6 @@ const DesktopMonitorSlideshow = () => {
         // Try to get error details from response
         try {
           const errorData = await response.json();
-          console.error('Error response data:', errorData);
           if (errorData.detail) {
             errorMessage += ` Details: ${errorData.detail}`;
           }
@@ -486,7 +468,6 @@ const DesktopMonitorSlideshow = () => {
       }
 
       const data = await response.json();
-      console.log('Upload successful:', data);
       
       setUploadProgress({ message: 'Updating display...', percent: 90 });
       
@@ -510,7 +491,6 @@ const DesktopMonitorSlideshow = () => {
       }, 1000);
 
     } catch (error) {
-      console.error('Upload error:', error);
       alert(`Upload failed: ${error.message}`);
       
       // Show detailed error info
@@ -554,7 +534,6 @@ const DesktopMonitorSlideshow = () => {
     const token = getAuthToken();
     if (token) {
       alert(`Token found (first 20 chars): ${token.substring(0, 20)}...`);
-      console.log('Full token:', token);
     } else {
       alert('No token found in storage');
     }
@@ -1191,314 +1170,6 @@ const DesktopMonitorSlideshow = () => {
 
 
 
-// import React, { useState, useEffect, useRef } from 'react';
-// import slide1 from "../assets/images/14.png";
-// import slide3 from "../assets/images/g20.jpg";
-// import slide4Image from "../assets/images/pc7.jpg";
-
-// // DesktopMonitorSlideshow component
-// const DesktopMonitorSlideshow = () => {
-//   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-//   const [lampOn, setLampOn] = useState(true);
-//   const [apiSlides, setApiSlides] = useState([]);
-//   const [isLoading, setIsLoading] = useState(true);
-//   const [apiError, setApiError] = useState(null);
-//   const frameRef = useRef(null);
-//   const scaleRef = useRef(null);
-
-//   // Original slides as fallback
-//   const fallbackSlides = [slide1, slide1, slide1];
-//   const MY_SLIDES1 = [slide3, slide4Image, slide1];
-
-//   // Fetch slides from API
-//   useEffect(() => {
-//     const fetchSlides = async () => {
-//       try {
-//         setIsLoading(true);
-//         setApiError(null);
-//         console.log('Fetching slides from API...');
-        
-//         const response = await fetch('http://127.0.0.1:8000/api/slide1/1/', {
-//           method: 'GET',
-//           headers: {
-//             'Content-Type': 'application/json',
-//             'Accept': 'application/json',
-//           },
-//           mode: 'cors'
-//         });
-
-//         console.log('Response status:', response.status);
-        
-//         if (!response.ok) {
-//           throw new Error(`HTTP error! Status: ${response.status}`);
-//         }
-
-//         const contentType = response.headers.get('content-type');
-//         console.log('Content-Type:', contentType);
-        
-//         if (contentType && contentType.includes('application/json')) {
-//           const data = await response.json();
-//           console.log('API Response:', data);
-          
-//           // Extract image1, image2, image3 from the API response
-//           let slidesArray = [];
-          
-//           if (data && typeof data === 'object') {
-//             // Check for image1, image2, image3 properties
-//             if (data.image1) slidesArray.push(data.image1);
-//             if (data.image2) slidesArray.push(data.image2);
-//             if (data.image3) slidesArray.push(data.image3);
-            
-//             console.log('Extracted slides:', slidesArray);
-            
-//             if (slidesArray.length > 0) {
-//               setApiSlides(slidesArray);
-//             } else {
-//               console.warn('No image properties found in API response');
-//               setApiError('No images found in API response');
-//               setApiSlides(fallbackSlides);
-//             }
-//           } else {
-//             console.warn('Unexpected API response format');
-//             setApiError('Invalid API response format');
-//             setApiSlides(fallbackSlides);
-//           }
-//         } else {
-//           const text = await response.text();
-//           console.warn('Response is not JSON:', text.substring(0, 100));
-//           setApiError('API response is not JSON');
-//           setApiSlides(fallbackSlides);
-//         }
-//       } catch (error) {
-//         console.error('Error fetching slides:', error);
-//         setApiError(`Failed to fetch slides: ${error.message}`);
-//         setApiSlides(fallbackSlides);
-//       } finally {
-//         setIsLoading(false);
-//       }
-//     };
-
-//     fetchSlides();
-//   }, []);
-
-//   // Slideshow auto-change - use apiSlides when available
-//   useEffect(() => {
-//     const slidesToUse = apiSlides.length > 0 ? apiSlides : fallbackSlides;
-    
-//     const interval = setInterval(() => {
-//       setCurrentSlideIndex((prev) =>
-//         prev === slidesToUse.length - 1 ? 0 : prev + 1
-//       );
-//     }, 3000);
-    
-//     return () => clearInterval(interval);
-//   }, [apiSlides]);
-
-//   // Responsive scaling
-//   useEffect(() => {
-//     function handleResize() {
-//       if (!frameRef.current || !scaleRef.current) return;
-//       const containerWidth = frameRef.current.offsetWidth;
-//       const scale = containerWidth / 1200;
-//       scaleRef.current.style.transform = `scale(${scale})`;
-//     }
-//     handleResize();
-//     window.addEventListener("resize", handleResize);
-//     return () => window.removeEventListener("resize", handleResize);
-//   }, []);
-
-//   // Blinking lamp effect
-//   useEffect(() => {
-//     const blinkInterval = setInterval(() => {
-//       setLampOn((prev) => !prev);
-//     }, 800);
-//     return () => clearInterval(blinkInterval);
-//   }, []);
-
-//   // Determine which slides to display
-//   const displaySlides = apiSlides.length > 0 ? apiSlides : fallbackSlides;
-
-//   return (
-//     <div className="relative w-full bg-gray-50 overflow-x-hidden">
-//       {/* Responsive wrapper */}
-//       <div
-//         ref={frameRef}
-//         className="relative w-full max-w-6xl mx-auto"
-//         style={{ aspectRatio: "1200 / 528" }}
-//       >
-//         {/* Scaled desktop frame */}
-//         <div
-//           ref={scaleRef}
-//           className="absolute top-0 left-0 origin-top-left"
-//           style={{ width: "1200px", height: "528px" }}
-//         >
-//           {/* Background desktop frame */}
-//           <img
-//             src={slide4Image}
-//             alt="Desktop Frame"
-//             className="absolute top-0 left-0 w-full h-full"
-//             style={{
-//               objectFit: "cover",
-//               objectPosition: "center",
-//             }}
-//           />
-
-//           {/* Monitor Screen */}
-//           <div
-//             className="absolute overflow-hidden"
-//             style={{
-//               top: "36.5%",
-//               left: "54.3%",
-//               width: "26.4%",
-//               height: "38.5%",
-//               borderRadius: "2px",
-//               transform: "perspective(700px) rotateY(-17deg) rotateX(8deg)",
-//               boxShadow: "inset 0 0 100px rgba(10,10,10,10)",
-//               clipPath: "polygon(0.1% 3%, 97% 1%, 98% 98%, 3.7% 94%)",
-//             }}
-//           >
-//             {MY_SLIDES1.map((slide, i) => (
-//               <img
-//                 key={i}
-//                 src={slide}
-//                 alt={`Monitor Slide ${i}`}
-//                 className={`absolute top-0 left-0 w-full h-full transition-opacity duration-700 ${
-//                   currentSlideIndex === i ? "opacity-100" : "opacity-0"
-//                 }`}
-//                 style={{ objectFit: "cover", objectPosition: "center" }}
-//                 loading="lazy"
-//                 onError={(e) => {
-//                   console.error(`Failed to load monitor slide ${i}`);
-//                   e.target.style.display = 'none';
-//                 }}
-//               />
-//             ))}
-//           </div>
-
-//           {/* Blinking Lamp */}
-//           <div
-//             className="absolute rounded-full pointer-events-none"
-//             style={{
-//               top: "49.5%",
-//               left: "42.8%",
-//               width: "150px",
-//               height: "150px",
-//               background:
-//                 "radial-gradient(circle, rgba(255,180,50,0.8) 0%, transparent 70%)",
-//               opacity: lampOn ? 0.9 : 0.7,
-//               filter: "blur(15px)",
-//               animation: "flicker 3s infinite alternate",
-//               transform: "scale(1)",
-//               zIndex: 5,
-//             }}
-//           />
-
-//           <style>
-//             {`
-//             @keyframes flicker {
-//               0%   { transform: scale(1); opacity: 0.9; filter: blur(12px); }
-//               20%  { transform: scale(1.05); opacity: 1; filter: blur(14px); }
-//               40%  { transform: scale(0.95); opacity: 0.8; filter: blur(10px); }
-//               60%  { transform: scale(1.1); opacity: 1; filter: blur(15px); }
-//               80%  { transform: scale(0.98); opacity: 0.85; filter: blur(11px); }
-//               100% { transform: scale(1); opacity: 0.9; filter: blur(12px); }
-//             }
-//           `}
-//           </style>
-
-//           {/* Small Panel with API Slides */}
-//           <div
-//             className="absolute overflow-hidden bg-black"
-//             style={{
-//               top: "69.9%",
-//               left: "39.0%",
-//               width: "10.9%",
-//               height: "14.5%",
-//               transform: "perspective(700px) rotateY(-17deg) rotateX(8deg)",
-//               borderRadius: "2px",
-//               boxShadow: "inset 0 0 100px rgba(10,10,10,10)",
-//               clipPath: "polygon(3% 2%, 97% 1%, 98% 98%, 1% 94%)",
-//             }}
-//           >
-//             {/* Loading Indicator */}
-//             {isLoading && (
-//               <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-//                 <div className="text-white text-sm animate-pulse">Loading API slides...</div>
-//               </div>
-//             )}
-            
-//             {/* Error Display */}
-//             {apiError && !isLoading && (
-//               <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-//                 <div className="text-white text-xs text-center p-2">
-//                   {apiError}
-//                   <div className="mt-1 text-gray-400">Using fallback images</div>
-//                 </div>
-//               </div>
-//             )}
-            
-//             {/* Display Slides */}
-//             {!isLoading && displaySlides.map((slide, i) => (
-//               <img
-//                 key={i}
-//                 src={slide}
-//                 alt={`Slide ${i + 1}`}
-//                 className={`absolute top-0 left-0 w-full h-full transition-opacity duration-700 ${
-//                   currentSlideIndex === i ? "opacity-100" : "opacity-0"
-//                 }`}
-//                 style={{ 
-//                   objectFit: "cover", 
-//                   objectPosition: "center",
-//                   // Debug border to see if images are loading
-//                   border: slide.includes('127.0.0.1') ? '1px solid #00ff00' : '1px solid #ff0000'
-//                 }}
-//                 loading="lazy"
-//                 onLoad={() => console.log(`✓ Slide ${i} loaded:`, slide.substring(0, 50) + '...')}
-//                 onError={(e) => {
-//                   console.error(`✗ Failed to load slide ${i}:`, slide);
-//                   console.log('Trying fallback image...');
-//                   if (fallbackSlides[i]) {
-//                     e.target.src = fallbackSlides[i];
-//                   }
-//                 }}
-//               />
-//             ))}
-            
-//             {/* Debug Info */}
-//             {/* {!isLoading && process.env.NODE_ENV === 'development' && (
-//               <div className="absolute bottom-1 left-1 text-xs text-white bg-black/70 p-1 rounded">
-//                 {apiSlides.length > 0 ? (
-//                   <div>
-//                     <div>API Loaded: {apiSlides.length} images</div>
-//                     <div className="text-green-400">✓ Using API images</div>
-//                   </div>
-//                 ) : (
-//                   <div className="text-yellow-400">⚠ Using fallback images</div>
-//                 )}
-//               </div>
-//             )} */}
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// The rest of your CreativeAgencyPortfolio component remains the same...
-
-// The rest of your CreativeAgencyPortfolio component remains exactly the same...
-
-// import React, { useState, useEffect } from 'react';
-// import DesktopMonitorSlideshow from './DesktopMonitorSlideshow'; // Make sure to import
-
-// import React, { useState, useEffect } from 'react';
-// import DesktopMonitorSlideshow from './DesktopMonitorSlideshow';
-
-// import React, { useState, useEffect } from 'react';
-// import DesktopMonitorSlideshow from './DesktopMonitorSlideshow';
-
-// import React, { useState, useEffect } from 'react';
-// import DesktopMonitorSlideshow from './DesktopMonitorSlideshow';
 
 const LandingPage = ({ showAdminLogin = false }) => {
   const [activeTab, setActiveTab] = useState('all');
@@ -1662,7 +1333,6 @@ const LandingPage = ({ showAdminLogin = false }) => {
         setStats(defaultStats);
       }
     } catch (error) {
-      console.error('Error fetching statistics:', error);
       setStats(defaultStats);
     } finally {
       setIsLoading(false);
@@ -1692,7 +1362,6 @@ const LandingPage = ({ showAdminLogin = false }) => {
         setPortfolioItems(defaultPortfolioItems);
       }
     } catch (error) {
-      console.error('Error fetching portfolio items:', error);
       setPortfolioItems(defaultPortfolioItems);
     } finally {
       setPortfolioLoading(false);
@@ -1722,7 +1391,6 @@ const LandingPage = ({ showAdminLogin = false }) => {
         setServices(defaultServices);
       }
     } catch (error) {
-      console.error('Error fetching services:', error);
       setServices(defaultServices);
     } finally {
       setServicesLoading(false);
@@ -1752,7 +1420,6 @@ const LandingPage = ({ showAdminLogin = false }) => {
         setTestimonials(defaultTestimonials);
       }
     } catch (error) {
-      console.error('Error fetching testimonials:', error);
       setTestimonials(defaultTestimonials);
     } finally {
       setTestimonialsLoading(false);
@@ -1782,7 +1449,6 @@ const LandingPage = ({ showAdminLogin = false }) => {
         setClients(defaultClients);
       }
     } catch (error) {
-      console.error('Error fetching clients:', error);
       setClients(defaultClients);
     } finally {
       setClientsLoading(false);
@@ -1820,11 +1486,9 @@ const LandingPage = ({ showAdminLogin = false }) => {
         alert('Statistic added successfully!');
       } else {
         const errorData = await response.json();
-        console.error('Failed to add statistic:', errorData);
         alert(`Failed to add statistic: ${JSON.stringify(errorData)}`);
       }
     } catch (error) {
-      console.error('Error adding statistic:', error);
       alert('Error adding statistic');
     }
   };
@@ -1863,11 +1527,9 @@ const LandingPage = ({ showAdminLogin = false }) => {
         alert('Statistic updated successfully!');
       } else {
         const errorData = await response.json();
-        console.error('Failed to update statistic:', errorData);
         alert(`Failed to update statistic: ${JSON.stringify(errorData)}`);
       }
     } catch (error) {
-      console.error('Error updating statistic:', error);
       alert('Error updating statistic');
     }
   };
@@ -1899,11 +1561,9 @@ const LandingPage = ({ showAdminLogin = false }) => {
         alert('Statistic deleted successfully!');
       } else {
         const errorData = await response.json();
-        console.error('Failed to delete statistic:', errorData);
         alert(`Failed to delete statistic: ${JSON.stringify(errorData)}`);
       }
     } catch (error) {
-      console.error('Error deleting statistic:', error);
       alert('Error deleting statistic');
     }
   };
@@ -1970,11 +1630,9 @@ const LandingPage = ({ showAdminLogin = false }) => {
         alert('Portfolio item added successfully!');
       } else {
         const errorData = await response.json();
-        console.error('Failed to add portfolio item:', errorData);
         alert(`Failed to add portfolio item: ${JSON.stringify(errorData)}`);
       }
     } catch (error) {
-      console.error('Error adding portfolio item:', error);
       alert('Error adding portfolio item');
     }
   };
@@ -2039,11 +1697,9 @@ const LandingPage = ({ showAdminLogin = false }) => {
         alert('Portfolio item updated successfully!');
       } else {
         const errorData = await response.json();
-        console.error('Failed to update portfolio item:', errorData);
         alert(`Failed to update portfolio item: ${JSON.stringify(errorData)}`);
       }
     } catch (error) {
-      console.error('Error updating portfolio item:', error);
       alert('Error updating portfolio item');
     }
   };
@@ -2077,11 +1733,9 @@ const LandingPage = ({ showAdminLogin = false }) => {
         alert('Portfolio item deleted successfully!');
       } else {
         const errorData = await response.json();
-        console.error('Failed to delete portfolio item:', errorData);
         alert(`Failed to delete portfolio item: ${JSON.stringify(errorData)}`);
       }
     } catch (error) {
-      console.error('Error deleting portfolio item:', error);
       alert('Error deleting portfolio item');
     }
   };
@@ -2117,11 +1771,9 @@ const LandingPage = ({ showAdminLogin = false }) => {
         alert('Service added successfully!');
       } else {
         const errorData = await response.json();
-        console.error('Failed to add service:', errorData);
         alert(`Failed to add service: ${JSON.stringify(errorData)}`);
       }
     } catch (error) {
-      console.error('Error adding service:', error);
       alert('Error adding service');
     }
   };
@@ -2161,11 +1813,9 @@ const LandingPage = ({ showAdminLogin = false }) => {
         alert('Service updated successfully!');
       } else {
         const errorData = await response.json();
-        console.error('Failed to update service:', errorData);
         alert(`Failed to update service: ${JSON.stringify(errorData)}`);
       }
     } catch (error) {
-      console.error('Error updating service:', error);
       alert('Error updating service');
     }
   };
@@ -2197,11 +1847,9 @@ const LandingPage = ({ showAdminLogin = false }) => {
         alert('Service deleted successfully!');
       } else {
         const errorData = await response.json();
-        console.error('Failed to delete service:', errorData);
         alert(`Failed to delete service: ${JSON.stringify(errorData)}`);
       }
     } catch (error) {
-      console.error('Error deleting service:', error);
       alert('Error deleting service');
     }
   };
@@ -2245,11 +1893,9 @@ const LandingPage = ({ showAdminLogin = false }) => {
         alert('Testimonial added successfully!');
       } else {
         const errorData = await response.json();
-        console.error('Failed to add testimonial:', errorData);
         
         // If the error is about avatar being a file field, try without avatar
         if (errorData.avatar && errorData.avatar[0]?.includes('file')) {
-          console.log('Retrying without avatar field...');
           const retryData = {
             text: newTestimonial.text,
             author: newTestimonial.author,
@@ -2280,7 +1926,6 @@ const LandingPage = ({ showAdminLogin = false }) => {
         }
       }
     } catch (error) {
-      console.error('Error adding testimonial:', error);
       alert('Error adding testimonial');
     }
   };
@@ -2324,7 +1969,6 @@ const LandingPage = ({ showAdminLogin = false }) => {
         alert('Testimonial updated successfully!');
       } else {
         const errorData = await response.json();
-        console.error('Failed to update testimonial:', errorData);
         
         // If error is about avatar, try without it
         if (errorData.avatar && errorData.avatar[0]?.includes('file')) {
@@ -2359,7 +2003,6 @@ const LandingPage = ({ showAdminLogin = false }) => {
         }
       }
     } catch (error) {
-      console.error('Error updating testimonial:', error);
       alert('Error updating testimonial');
     }
   };
@@ -2391,11 +2034,9 @@ const LandingPage = ({ showAdminLogin = false }) => {
         alert('Testimonial deleted successfully!');
       } else {
         const errorData = await response.json();
-        console.error('Failed to delete testimonial:', errorData);
         alert(`Failed to delete testimonial: ${JSON.stringify(errorData)}`);
       }
     } catch (error) {
-      console.error('Error deleting testimonial:', error);
       alert('Error deleting testimonial');
     }
   };
@@ -2431,11 +2072,9 @@ const LandingPage = ({ showAdminLogin = false }) => {
         alert('Client added successfully!');
       } else {
         const errorData = await response.json();
-        console.error('Failed to add client:', errorData);
         alert(`Failed to add client: ${JSON.stringify(errorData)}`);
       }
     } catch (error) {
-      console.error('Error adding client:', error);
       alert('Error adding client');
     }
   };
@@ -2473,11 +2112,9 @@ const LandingPage = ({ showAdminLogin = false }) => {
         alert('Client updated successfully!');
       } else {
         const errorData = await response.json();
-        console.error('Failed to update client:', errorData);
         alert(`Failed to update client: ${JSON.stringify(errorData)}`);
       }
     } catch (error) {
-      console.error('Error updating client:', error);
       alert('Error updating client');
     }
   };
@@ -2509,11 +2146,9 @@ const LandingPage = ({ showAdminLogin = false }) => {
         alert('Client deleted successfully!');
       } else {
         const errorData = await response.json();
-        console.error('Failed to delete client:', errorData);
         alert(`Failed to delete client: ${JSON.stringify(errorData)}`);
       }
     } catch (error) {
-      console.error('Error deleting client:', error);
       alert('Error deleting client');
     }
   };
@@ -3868,6 +3503,3 @@ const LandingPage = ({ showAdminLogin = false }) => {
 };
 
 export default LandingPage ;
-
-
-

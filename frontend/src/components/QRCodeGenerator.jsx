@@ -1,139 +1,1 @@
-// src/components/QRCodeGenerator.jsx
-import React, { useState, useEffect } from 'react';
-
-const QRCodeGenerator = ({ architectureId, type }) => {
-  const [showModal, setShowModal] = useState(false);
-  const [forms, setForms] = useState([]);
-  const [selectedForm, setSelectedForm] = useState('');
-  const [count, setCount] = useState(1);
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  useEffect(() => {
-    if (showModal && architectureId) {
-      fetchForms();
-    }
-  }, [showModal, architectureId]);
-
-  const fetchForms = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/forms/${architectureId}/`);
-      const data = await response.json();
-      setForms(data);
-    } catch (error) {
-      console.error('Error fetching forms:', error);
-    }
-  };
-
-  const generateQRCodes = async () => {
-    if (!selectedForm || count < 1) {
-      alert('Please select a form and enter a valid count');
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/generate-qr-codes/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          form_id: selectedForm,
-          count: count,
-          architecture_id: architectureId
-        })
-      });
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `qr_codes_${forms.find(f => f.id === parseInt(selectedForm))?.name || 'form'}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-        setShowModal(false);
-      } else {
-        alert('Error generating QR codes');
-      }
-    } catch (error) {
-      console.error('Error generating QR codes:', error);
-      alert('Error generating QR codes');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  return (
-    <>
-      <button
-        className="px-3 py-1 bg-purple-600 text-white rounded text-sm ml-2"
-        onClick={() => setShowModal(true)}
-        title="Generate QR Codes"
-      >
-        <i className="fas fa-qrcode mr-1"></i> QR Codes
-      </button>
-
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96">
-            <h2 className="text-xl font-semibold mb-4">Generate QR Codes</h2>
-            
-            <div className="mb-4">
-              <label className="block text-gray-700 text-sm font-bold mb-2">
-                Select Form
-              </label>
-              <select
-                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                value={selectedForm}
-                onChange={(e) => setSelectedForm(e.target.value)}
-              >
-                <option value="">Select a form</option>
-                {forms.map(form => (
-                  <option key={form.id} value={form.id}>
-                    {form.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="mb-4">
-              <label className="block text-gray-700 text-sm font-bold mb-2">
-                Number of QR Codes
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="100"
-                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                value={count}
-                onChange={(e) => setCount(parseInt(e.target.value) || 1)}
-              />
-            </div>
-            
-            <div className="flex justify-end space-x-2">
-              <button
-                className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
-                onClick={() => setShowModal(false)}
-                disabled={isGenerating}
-              >
-                Cancel
-              </button>
-              <button
-                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
-                onClick={generateQRCodes}
-                disabled={isGenerating}
-              >
-                {isGenerating ? 'Generating...' : 'Generate'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-};
-
-export default QRCodeGenerator;
+// src/components/QRCodeGenerator.jsximport React, { useState, useEffect } from 'react';const QRCodeGenerator = ({ architectureId, type }) => {  const [showModal, setShowModal] = useState(false);  const [forms, setForms] = useState([]);  const [selectedForm, setSelectedForm] = useState('');  const [count, setCount] = useState(1);  const [isGenerating, setIsGenerating] = useState(false);  useEffect(() => {    if (showModal && architectureId) {      fetchForms();    }  }, [showModal, architectureId]);  const fetchForms = async () => {    try {      const response = await fetch(`${API_BASE_URL}/forms/${architectureId}/`);      const data = await response.json();      setForms(data);    } catch (error) {    }  };  const generateQRCodes = async () => {    if (!selectedForm || count < 1) {      alert('Please select a form and enter a valid count');      return;    }    setIsGenerating(true);    try {      const response = await fetch(`${API_BASE_URL}/generate-qr-codes/`, {        method: 'POST',        headers: {          'Content-Type': 'application/json',        },        body: JSON.stringify({          form_id: selectedForm,          count: count,          architecture_id: architectureId        })      });      if (response.ok) {        const blob = await response.blob();        const url = window.URL.createObjectURL(blob);        const a = document.createElement('a');        a.href = url;        a.download = `qr_codes_${forms.find(f => f.id === parseInt(selectedForm))?.name || 'form'}.pdf`;        document.body.appendChild(a);        a.click();        a.remove();        window.URL.revokeObjectURL(url);        setShowModal(false);      } else {        alert('Error generating QR codes');      }    } catch (error) {      alert('Error generating QR codes');    } finally {      setIsGenerating(false);    }  };  return (    <>      <button        className="px-3 py-1 bg-purple-600 text-white rounded text-sm ml-2"        onClick={() => setShowModal(true)}        title="Generate QR Codes"      >        <i className="fas fa-qrcode mr-1"></i> QR Codes      </button>      {showModal && (        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">          <div className="bg-white rounded-lg p-6 w-96">            <h2 className="text-xl font-semibold mb-4">Generate QR Codes</h2>            <div className="mb-4">              <label className="block text-gray-700 text-sm font-bold mb-2">                Select Form              </label>              <select                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"                value={selectedForm}                onChange={(e) => setSelectedForm(e.target.value)}              >                <option value="">Select a form</option>                {forms.map(form => (                  <option key={form.id} value={form.id}>                    {form.name}                  </option>                ))}              </select>            </div>            <div className="mb-4">              <label className="block text-gray-700 text-sm font-bold mb-2">                Number of QR Codes              </label>              <input                type="number"                min="1"                max="100"                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"                value={count}                onChange={(e) => setCount(parseInt(e.target.value) || 1)}              />            </div>            <div className="flex justify-end space-x-2">              <button                className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"                onClick={() => setShowModal(false)}                disabled={isGenerating}              >                Cancel              </button>              <button                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"                onClick={generateQRCodes}                disabled={isGenerating}              >                {isGenerating ? 'Generating...' : 'Generate'}              </button>            </div>          </div>        </div>      )}    </>  );};export default QRCodeGenerator;

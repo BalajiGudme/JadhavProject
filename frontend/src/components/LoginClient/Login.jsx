@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -47,8 +46,6 @@ function Login({ onClose, onSwitchToRegister }) {
         }
       );
 
-      console.log("Login response:", response.data);
-
       // Check if user is admin
       if (response.data.user.role === "admin") {
         setError("Admin users must login through the admin portal.");
@@ -70,9 +67,6 @@ function Login({ onClose, onSwitchToRegister }) {
       }
       
     } catch (err) {
-      console.log("Full error object:", err);
-      console.log("Error response:", err.response);
-      
       if (err.response) {
         if (err.response.status === 401) {
           setError("Invalid email or password.");
@@ -133,8 +127,6 @@ function Login({ onClose, onSwitchToRegister }) {
     setShowOtpInput(false);
     setShowNewPasswordInput(false);
 
-    console.log("Requesting OTP for email:", forgotPasswordEmail);
-
     try {
       const response = await axios.post(
         "http://127.0.0.1:8000/api/auth/password-reset/request/",
@@ -148,8 +140,6 @@ function Login({ onClose, onSwitchToRegister }) {
           timeout: 10000,
         }
       );
-
-      console.log("OTP request successful:", response.data);
       
       // Only show OTP input if request was successful
       setForgotPasswordSuccess(true);
@@ -157,8 +147,6 @@ function Login({ onClose, onSwitchToRegister }) {
       setShowOtpInput(true);
       
     } catch (err) {
-      console.log("Forgot password error:", err.response?.data);
-      
       // Clear any previous OTP state on error
       setOtp("");
       setShowOtpInput(false);
@@ -194,8 +182,6 @@ function Login({ onClose, onSwitchToRegister }) {
       return;
     }
 
-    console.log("Verifying OTP:", otp, "for email:", forgotPasswordEmail);
-
     try {
       const response = await axios.post(
         "http://127.0.0.1:8000/api/auth/password-reset/verify-otp/",
@@ -211,8 +197,6 @@ function Login({ onClose, onSwitchToRegister }) {
         }
       );
 
-      console.log("OTP verification response:", response.data);
-
       if (response.status === 200) {
         setForgotPasswordSuccess(true);
         setForgotPasswordMessage("OTP verified successfully! Now set your new password.");
@@ -221,9 +205,6 @@ function Login({ onClose, onSwitchToRegister }) {
       }
       
     } catch (err) {
-      console.log("Verify OTP error:", err.response?.data);
-      console.log("OTP that failed:", otp);
-      
       setForgotPasswordSuccess(false);
       
       if (err.response?.data) {
@@ -271,17 +252,12 @@ function Login({ onClose, onSwitchToRegister }) {
       return;
     }
 
-    // Debug: Log what you're sending
     const payload = {
       email: forgotPasswordEmail,
       otp: otp.trim(),
       new_password: newPassword,
       confirm_password: confirmPassword,
     };
-    
-    console.log("Sending payload to backend:", payload);
-    console.log("OTP value (type):", otp, typeof otp);
-    console.log("Email being sent:", forgotPasswordEmail);
 
     try {
       const response = await axios.post(
@@ -295,7 +271,6 @@ function Login({ onClose, onSwitchToRegister }) {
         }
       );
 
-      console.log("Reset password response:", response.data);
       setForgotPasswordSuccess(true);
       setForgotPasswordMessage("Password reset successfully! You can now login with your new password.");
       
@@ -305,10 +280,6 @@ function Login({ onClose, onSwitchToRegister }) {
       }, 3000);
       
     } catch (err) {
-      console.log("Reset password error:", err.response?.data);
-      console.log("Status code:", err.response?.status);
-      console.log("Full error response:", err.response);
-      
       setForgotPasswordSuccess(false);
       
       if (err.response?.data) {
@@ -397,7 +368,7 @@ function Login({ onClose, onSwitchToRegister }) {
   // New Password Form
   if (showForgotPassword && showNewPasswordInput) {
     return (
-      <div className="fixed inset-0   flex justify-center items-center z-50 p-4">
+      <div className="fixed inset-0 flex justify-center items-center z-50 p-4">
         <div className="bg-white rounded-xl w-full max-w-md relative p-6 shadow-lg animate-fade-in">
           <button
             onClick={handleClose}
@@ -494,7 +465,7 @@ function Login({ onClose, onSwitchToRegister }) {
   // OTP Verification Form
   if (showForgotPassword && showOtpInput) {
     return (
-      <div className="fixed inset-0 bg-opacity-50 flex justify-center items-center z-50 p-4">
+      <div className="fixed inset-0 flex justify-center items-center z-50 p-4">
         <div className="bg-white rounded-xl w-full max-w-md relative p-6 shadow-lg animate-fade-in">
           <button
             onClick={handleClose}
@@ -592,7 +563,7 @@ function Login({ onClose, onSwitchToRegister }) {
   // Forgot Password Form (Initial)
   if (showForgotPassword) {
     return (
-      <div className="fixed inset-0  bg-opacity-50 flex justify-center items-center z-50 p-4">
+      <div className="fixed inset-0 flex justify-center items-center z-50 p-4">
         <div className="bg-white rounded-xl w-full max-w-md relative p-6 shadow-lg animate-fade-in">
           <button
             onClick={handleClose}
@@ -670,7 +641,7 @@ function Login({ onClose, onSwitchToRegister }) {
 
   // Main Login Form
   return (
-    <div className="fixed inset-0  bg-opacity-50 flex justify-center items-center z-50 p-4">
+    <div className="fixed inset-0 flex justify-center items-center z-50 p-4">
       <div className="bg-white rounded-xl w-full max-w-md relative p-6 shadow-lg animate-fade-in">
         <button
           onClick={handleClose}

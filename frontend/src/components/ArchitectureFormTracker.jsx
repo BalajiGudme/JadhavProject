@@ -1,825 +1,1 @@
-
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-
-// Set base URL for API
-const API_BASE_URL = window.API_BASE_URL || "http://localhost:8000";
-
-// Token utility functions
-const getAuthToken = () => {
-  return localStorage.getItem('access') || localStorage.getItem('authToken');
-};
-
-const refreshAuthToken = async () => {
-  try {
-    const refreshToken = localStorage.getItem('refresh') || sessionStorage.getItem('refresh');
-    if (!refreshToken) {
-      return null;
-    }
-
-    const response = await axios.post(`${API_BASE_URL}/api/token/refresh/`, {
-      refresh: refreshToken
-    });
-
-    if (response.data.access) {
-      localStorage.setItem('access', response.data.access);
-      return response.data.access;
-    }
-  } catch (error) {
-    console.error('Token refresh failed:', error);
-  }
-  return null;
-};
-
-// Main Component
-const ArchitectureFormTracker = () => {
-  const [selectedArchId, setSelectedArchId] = useState('');
-  const [architectures, setArchitectures] = useState([]);
-  const [submittedForms, setSubmittedForms] = useState([]);
-  const [unusedTokens, setUnusedTokens] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [stats, setStats] = useState({
-    totalTokens: 0,
-    submittedForms: 0,
-    unusedTokens: 0
-  });
-
-  // Pagination states for submitted tokens
-  const [submittedCurrentPage, setSubmittedCurrentPage] = useState(1);
-  const [submittedRecordsPerPage, setSubmittedRecordsPerPage] = useState(10);
-  
-  // Pagination states for unused tokens
-  const [unusedCurrentPage, setUnusedCurrentPage] = useState(1);
-  const [unusedRecordsPerPage, setUnusedRecordsPerPage] = useState(10);
-  
-  const [recordsPerPageOptions] = useState([5, 10, 20, 50, 100]);
-
-  // Fetch architectures on component mount
-  useEffect(() => {
-    fetchArchitectures();
-  }, []);
-
-  // Fetch data when architecture changes
-  useEffect(() => {
-    if (selectedArchId) {
-      fetchArchitectureData(selectedArchId);
-      // Reset pagination when architecture changes
-      setSubmittedCurrentPage(1);
-      setUnusedCurrentPage(1);
-    }
-  }, [selectedArchId]);
-
-  const fetchArchitectures = async () => {
-    try {
-      setLoading(true);
-      const token = getAuthToken();
-      
-      if (!token) {
-        setError('Please log in to access this page');
-        setLoading(false);
-        return;
-      }
-
-      const response = await axios.get(`${API_BASE_URL}/api/architecture/`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      setArchitectures(response.data);
-      if (response.data.length > 0 && !selectedArchId) {
-        setSelectedArchId(response.data[0].id);
-      }
-      setError(null);
-    } catch (err) {
-      if (err.response?.status === 401) {
-        const newToken = await refreshAuthToken();
-        if (newToken) {
-          fetchArchitectures();
-          return;
-        }
-      }
-      setError('Failed to fetch architectures');
-      console.error('Error fetching architectures:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchArchitectureData = async (architectureId) => {
-    try {
-      setLoading(true);
-      const token = getAuthToken();
-      
-      if (!token) {
-        setError('Please log in to access this page');
-        return;
-      }
-
-      const config = {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      };
-
-      // Fetch architecture responses to get submitted forms
-      const responsesResponse = await axios.get(
-        `${API_BASE_URL}/api/architecture/${architectureId}/responses/`,
-        config
-      );
-
-      // Fetch all tokens for this architecture
-      const tokensResponse = await axios.get(
-        `${API_BASE_URL}/api/form-tokens/?architecture=${architectureId}`,
-        config
-      );
-
-      processArchitectureData(responsesResponse.data, tokensResponse.data, architectureId);
-      setError(null);
-    } catch (err) {
-      if (err.response?.status === 401) {
-        const newToken = await refreshAuthToken();
-        if (newToken) {
-          fetchArchitectureData(architectureId);
-          return;
-        }
-      }
-      setError('Failed to fetch architecture data');
-      console.error('Error fetching architecture data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const processArchitectureData = (responsesData, tokensData, architectureId) => {
-    // Group responses by token
-    const groupedResponses = {};
-    if (responsesData.responses) {
-      responsesData.responses.forEach(response => {
-        const token = response.token;
-        if (!groupedResponses[token]) {
-          groupedResponses[token] = {
-            token: token,
-            responses: [],
-            submissionId: response.submission_id,
-            timestamp: response.timestamp
-          };
-        }
-        groupedResponses[token].responses.push(response);
-      });
-    }
-
-    // Extract token data from responses (only token information)
-    const forms = Object.values(groupedResponses).map(tokenData => ({
-      token: tokenData.token,
-      submissionId: tokenData.submissionId,
-      timestamp: tokenData.timestamp,
-      status: 'Submitted'
-    }));
-
-    // Get all tokens for this architecture
-    const allTokens = tokensData
-      .filter(token => token.architecture === parseInt(architectureId))
-      .map(token => token.token);
-
-    // Find unused tokens
-    const submittedTokens = forms.map(form => form.token);
-    const unused = allTokens.filter(token => !submittedTokens.includes(token));
-
-    setSubmittedForms(forms);
-    setUnusedTokens(unused.map(token => ({ token, status: 'Not Submitted' })));
-
-    // Update stats
-    setStats({
-      totalTokens: allTokens.length,
-      submittedForms: forms.length,
-      unusedTokens: unused.length
-    });
-  };
-
-  const handleArchitectureChange = (e) => {
-    setSelectedArchId(e.target.value);
-  };
-
-  const getArchitectureName = () => {
-    const arch = architectures.find(a => a.id === parseInt(selectedArchId));
-    return arch ? arch.name : 'Unknown Architecture';
-  };
-
-  const formatDate = (timestamp) => {
-    if (!timestamp) return '-';
-    try {
-      const date = new Date(timestamp);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
-      return '-';
-    }
-  };
-
-  const handleRetry = () => {
-    if (selectedArchId) {
-      fetchArchitectureData(selectedArchId);
-    } else {
-      fetchArchitectures();
-    }
-  };
-
-  // Pagination calculations for submitted tokens
-  const submittedIndexOfLastRecord = submittedCurrentPage * submittedRecordsPerPage;
-  const submittedIndexOfFirstRecord = submittedIndexOfLastRecord - submittedRecordsPerPage;
-  const submittedCurrentRecords = submittedForms.slice(submittedIndexOfFirstRecord, submittedIndexOfLastRecord);
-  const submittedTotalPages = Math.ceil(submittedForms.length / submittedRecordsPerPage);
-
-  // Pagination calculations for unused tokens
-  const unusedIndexOfLastRecord = unusedCurrentPage * unusedRecordsPerPage;
-  const unusedIndexOfFirstRecord = unusedIndexOfLastRecord - unusedRecordsPerPage;
-  const unusedCurrentRecords = unusedTokens.slice(unusedIndexOfFirstRecord, unusedIndexOfLastRecord);
-  const unusedTotalPages = Math.ceil(unusedTokens.length / unusedRecordsPerPage);
-
-  // Pagination component for submitted tokens
-  const SubmittedPagination = () => {
-    if (submittedForms.length === 0) return null;
-    
-    return (
-      <div className="px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-4 bg-white">
-        <div className="flex flex-col sm:flex-row items-center gap-2 text-sm">
-          <span className="text-gray-700">
-            Showing {submittedIndexOfFirstRecord + 1} to {Math.min(submittedIndexOfLastRecord, submittedForms.length)} of {submittedForms.length} records
-          </span>
-          <select
-            value={submittedRecordsPerPage}
-            onChange={(e) => {
-              setSubmittedRecordsPerPage(Number(e.target.value));
-              setSubmittedCurrentPage(1);
-            }}
-            className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
-          >
-            {recordsPerPageOptions.map(option => (
-              <option key={option} value={option}>
-                {option} per page
-              </option>
-            ))}
-          </select>
-        </div>
-        
-        <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
-          <button
-            onClick={() => setSubmittedCurrentPage(1)}
-            disabled={submittedCurrentPage === 1}
-            className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-colors ${
-              submittedCurrentPage === 1
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            First
-          </button>
-          <button
-            onClick={() => setSubmittedCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={submittedCurrentPage === 1}
-            className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-colors ${
-              submittedCurrentPage === 1
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Prev
-          </button>
-          
-          <span className="px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium">
-            Page {submittedCurrentPage} of {submittedTotalPages || 1}
-          </span>
-          
-          <button
-            onClick={() => setSubmittedCurrentPage(prev => Math.min(prev + 1, submittedTotalPages))}
-            disabled={submittedCurrentPage === submittedTotalPages || submittedTotalPages === 0}
-            className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-colors ${
-              submittedCurrentPage === submittedTotalPages || submittedTotalPages === 0
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Next
-          </button>
-          <button
-            onClick={() => setSubmittedCurrentPage(submittedTotalPages)}
-            disabled={submittedCurrentPage === submittedTotalPages || submittedTotalPages === 0}
-            className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-colors ${
-              submittedCurrentPage === submittedTotalPages || submittedTotalPages === 0
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Last
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // Pagination component for unused tokens
-  const UnusedPagination = () => {
-    if (unusedTokens.length === 0) return null;
-    
-    return (
-      <div className="px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-4 bg-white">
-        <div className="flex flex-col sm:flex-row items-center gap-2 text-sm">
-          <span className="text-gray-700">
-            Showing {unusedIndexOfFirstRecord + 1} to {Math.min(unusedIndexOfLastRecord, unusedTokens.length)} of {unusedTokens.length} records
-          </span>
-          <select
-            value={unusedRecordsPerPage}
-            onChange={(e) => {
-              setUnusedRecordsPerPage(Number(e.target.value));
-              setUnusedCurrentPage(1);
-            }}
-            className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
-          >
-            {recordsPerPageOptions.map(option => (
-              <option key={option} value={option}>
-                {option} per page
-              </option>
-            ))}
-          </select>
-        </div>
-        
-        <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
-          <button
-            onClick={() => setUnusedCurrentPage(1)}
-            disabled={unusedCurrentPage === 1}
-            className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-colors ${
-              unusedCurrentPage === 1
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            First
-          </button>
-          <button
-            onClick={() => setUnusedCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={unusedCurrentPage === 1}
-            className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-colors ${
-              unusedCurrentPage === 1
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Prev
-          </button>
-          
-          <span className="px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium">
-            Page {unusedCurrentPage} of {unusedTotalPages || 1}
-          </span>
-          
-          <button
-            onClick={() => setUnusedCurrentPage(prev => Math.min(prev + 1, unusedTotalPages))}
-            disabled={unusedCurrentPage === unusedTotalPages || unusedTotalPages === 0}
-            className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-colors ${
-              unusedCurrentPage === unusedTotalPages || unusedTotalPages === 0
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Next
-          </button>
-          <button
-            onClick={() => setUnusedCurrentPage(unusedTotalPages)}
-            disabled={unusedCurrentPage === unusedTotalPages || unusedTotalPages === 0}
-            className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-colors ${
-              unusedCurrentPage === unusedTotalPages || unusedTotalPages === 0
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Last
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // Mobile card component for submitted tokens
-  const SubmittedMobileCard = ({ form }) => {
-    return (
-      <div className="border border-gray-200 rounded-lg p-4 mb-3 bg-white shadow-sm">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
-              <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-              </svg>
-            </div>
-            <div>
-              <div className="font-semibold text-gray-900 break-all">{form.token}</div>
-            </div>
-          </div>
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">
-            {form.status}
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <div className="text-xs text-gray-500 mb-1">Submission ID</div>
-            <div className="font-medium text-gray-900 break-all">{form.submissionId || '-'}</div>
-          </div>
-          <div>
-            <div className="text-xs text-gray-500 mb-1">Date</div>
-            <div className="font-medium text-gray-900">{formatDate(form.timestamp)}</div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Mobile card component for unused tokens
-  const UnusedMobileCard = ({ tokenData }) => {
-    return (
-      <div className="border border-gray-200 rounded-lg p-4 mb-3 bg-white shadow-sm">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center mr-3">
-              <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-              </svg>
-            </div>
-            <div>
-              <div className="font-semibold text-gray-900 break-all">{tokenData.token}</div>
-            </div>
-          </div>
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
-            {tokenData.status}
-          </span>
-        </div>
-        <div className="text-sm text-gray-500 text-center bg-amber-50 rounded-lg py-2">
-          Awaiting Form Submission
-        </div>
-      </div>
-    );
-  };
-
-  // Loading state
-  if (loading && !selectedArchId) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex justify-center items-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-blue-500 mx-auto mb-4"></div>
-              <p className="text-gray-600 font-medium">Loading architectures...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">Error Loading Data</h3>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <button
-              onClick={handleRetry}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 py-30 px-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Architecture Selector Card */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-1">Select Architecture</h2>
-              <p className="text-gray-500 text-sm">Choose an architecture to view its tokens</p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative">
-                <select
-                  id="architecture"
-                  value={selectedArchId}
-                  onChange={handleArchitectureChange}
-                  className="w-full sm:w-64 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white text-gray-900 font-medium"
-                  disabled={loading}
-                >
-                  <option value="">Select Architecture</option>
-                  {architectures.map(arch => (
-                    <option key={arch.id} value={arch.id}>
-                      {arch.name} (ID: {arch.id})
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-              <button
-                onClick={handleRetry}
-                disabled={loading}
-                className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {loading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent"></div>
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {selectedArchId && (
-          <>
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
-                    <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Total Tokens</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.totalTokens}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
-                    <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Submitted Tokens</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.submittedForms}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center mr-4">
-                    <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Unused Tokens</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.unusedTokens}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Submitted Tokens Section */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">Submitted Tokens</h2>
-                  <p className="text-gray-500">Tokens that have been used for form submission</p>
-                </div>
-                <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                  {submittedForms.length} tokens
-                </span>
-              </div>
-
-              {loading ? (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-blue-500 mx-auto mb-4"></div>
-                  <p className="text-gray-600 font-medium">Loading submitted tokens...</p>
-                </div>
-              ) : submittedForms.length > 0 ? (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                  {/* Desktop Table */}
-                  <div className="hidden lg:block overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            #
-                          </th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            Token
-                          </th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            Submission ID
-                          </th>
-                          {/* <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            Submission Date
-                          </th> */}
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {submittedCurrentRecords.map((form, index) => {
-                          const actualIndex = submittedIndexOfFirstRecord + index + 1;
-                          return (
-                            <tr key={form.token} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-6 py-4 text-sm text-gray-500">{actualIndex}</td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-center">
-                                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
-                                    <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                                    </svg>
-                                  </div>
-                                  <div>
-                                    <div className="font-medium text-gray-900 break-all">{form.token}</div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className="font-medium text-gray-900 break-all">{form.submissionId || '-'}</span>
-                              </td>
-                              {/* <td className="px-6 py-4">
-                                <div className="text-sm text-gray-900">{formatDate(form.timestamp)}</div>
-                              </td> */}
-                              <td className="px-6 py-4">
-                                <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-medium">
-                                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
-                                  </svg>
-                                  {form.status}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Mobile Cards */}
-                  <div className="lg:hidden divide-y divide-gray-200">
-                    {submittedCurrentRecords.map(form => (
-                      <SubmittedMobileCard key={form.token} form={form} />
-                    ))}
-                  </div>
-
-                  {/* Pagination */}
-                  <SubmittedPagination />
-                </div>
-              ) : (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Submitted Tokens</h3>
-                  <p className="text-gray-500">No tokens have been submitted for this architecture yet.</p>
-                </div>
-              )}
-            </div>
-
-            {/* Unused Tokens Section */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">Unused Tokens</h2>
-                  <p className="text-gray-500">Tokens that haven't been used for form submission</p>
-                </div>
-                <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">
-                  {unusedTokens.length} tokens
-                </span>
-              </div>
-
-              {loading ? (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-blue-500 mx-auto mb-4"></div>
-                  <p className="text-gray-600 font-medium">Loading unused tokens...</p>
-                </div>
-              ) : unusedTokens.length > 0 ? (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                  {/* Desktop Table */}
-                  <div className="hidden lg:block overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            #
-                          </th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            Token
-                          </th>
-                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {unusedCurrentRecords.map((tokenData, index) => {
-                          const actualIndex = unusedIndexOfFirstRecord + index + 1;
-                          return (
-                            <tr key={tokenData.token} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-6 py-4 text-sm text-gray-500">{actualIndex}</td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-center">
-                                  <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
-                                    <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                                    </svg>
-                                  </div>
-                                  <div>
-                                    <div className="font-medium text-gray-900 break-all">{tokenData.token}</div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className="inline-flex items-center px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-sm font-medium">
-                                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                  {tokenData.status}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Mobile Cards */}
-                  <div className="lg:hidden divide-y divide-gray-200">
-                    {unusedCurrentRecords.map(tokenData => (
-                      <UnusedMobileCard key={tokenData.token} tokenData={tokenData} />
-                    ))}
-                  </div>
-
-                  {/* Pagination */}
-                  <UnusedPagination />
-                </div>
-              ) : (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">All Tokens Used</h3>
-                  <p className="text-gray-500">All tokens have been submitted. Great job!</p>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-
-        {!selectedArchId && architectures.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Select an Architecture</h3>
-            <p className="text-gray-500 mb-4">Choose an architecture from the dropdown to view its tokens</p>
-            <div className="w-48 h-1 bg-gray-200 rounded-full mx-auto"></div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default ArchitectureFormTracker;
+import React, { useState, useEffect } from 'react';import axios from 'axios';// Set base URL for APIconst API_BASE_URL = window.API_BASE_URL || "http://localhost:8000";// Token utility functionsconst getAuthToken = () => {  return localStorage.getItem('access') || localStorage.getItem('authToken');};const refreshAuthToken = async () => {  try {    const refreshToken = localStorage.getItem('refresh') || sessionStorage.getItem('refresh');    if (!refreshToken) {      return null;    }    const response = await axios.post(`${API_BASE_URL}/api/token/refresh/`, {      refresh: refreshToken    });    if (response.data.access) {      localStorage.setItem('access', response.data.access);      return response.data.access;    }  } catch (error) {  }  return null;};// Main Componentconst ArchitectureFormTracker = () => {  const [selectedArchId, setSelectedArchId] = useState('');  const [architectures, setArchitectures] = useState([]);  const [submittedForms, setSubmittedForms] = useState([]);  const [unusedTokens, setUnusedTokens] = useState([]);  const [loading, setLoading] = useState(true);  const [error, setError] = useState(null);  const [stats, setStats] = useState({    totalTokens: 0,    submittedForms: 0,    unusedTokens: 0  });  // Pagination states for submitted tokens  const [submittedCurrentPage, setSubmittedCurrentPage] = useState(1);  const [submittedRecordsPerPage, setSubmittedRecordsPerPage] = useState(10);  // Pagination states for unused tokens  const [unusedCurrentPage, setUnusedCurrentPage] = useState(1);  const [unusedRecordsPerPage, setUnusedRecordsPerPage] = useState(10);  const [recordsPerPageOptions] = useState([5, 10, 20, 50, 100]);  // Fetch architectures on component mount  useEffect(() => {    fetchArchitectures();  }, []);  // Fetch data when architecture changes  useEffect(() => {    if (selectedArchId) {      fetchArchitectureData(selectedArchId);      // Reset pagination when architecture changes      setSubmittedCurrentPage(1);      setUnusedCurrentPage(1);    }  }, [selectedArchId]);  const fetchArchitectures = async () => {    try {      setLoading(true);      const token = getAuthToken();      if (!token) {        setError('Please log in to access this page');        setLoading(false);        return;      }      const response = await axios.get(`${API_BASE_URL}/api/architecture/`, {        headers: {          Authorization: `Bearer ${token}`,          'Content-Type': 'application/json'        }      });      setArchitectures(response.data);      if (response.data.length > 0 && !selectedArchId) {        setSelectedArchId(response.data[0].id);      }      setError(null);    } catch (err) {      if (err.response?.status === 401) {        const newToken = await refreshAuthToken();        if (newToken) {          fetchArchitectures();          return;        }      }      setError('Failed to fetch architectures');    } finally {      setLoading(false);    }  };  const fetchArchitectureData = async (architectureId) => {    try {      setLoading(true);      const token = getAuthToken();      if (!token) {        setError('Please log in to access this page');        return;      }      const config = {        headers: {          Authorization: `Bearer ${token}`,          'Content-Type': 'application/json'        }      };      // Fetch architecture responses to get submitted forms      const responsesResponse = await axios.get(        `${API_BASE_URL}/api/architecture/${architectureId}/responses/`,        config      );      // Fetch all tokens for this architecture      const tokensResponse = await axios.get(        `${API_BASE_URL}/api/form-tokens/?architecture=${architectureId}`,        config      );      processArchitectureData(responsesResponse.data, tokensResponse.data, architectureId);      setError(null);    } catch (err) {      if (err.response?.status === 401) {        const newToken = await refreshAuthToken();        if (newToken) {          fetchArchitectureData(architectureId);          return;        }      }      setError('Failed to fetch architecture data');    } finally {      setLoading(false);    }  };  const processArchitectureData = (responsesData, tokensData, architectureId) => {    // Group responses by token    const groupedResponses = {};    if (responsesData.responses) {      responsesData.responses.forEach(response => {        const token = response.token;        if (!groupedResponses[token]) {          groupedResponses[token] = {            token: token,            responses: [],            submissionId: response.submission_id,            timestamp: response.timestamp          };        }        groupedResponses[token].responses.push(response);      });    }    // Extract token data from responses (only token information)    const forms = Object.values(groupedResponses).map(tokenData => ({      token: tokenData.token,      submissionId: tokenData.submissionId,      timestamp: tokenData.timestamp,      status: 'Submitted'    }));    // Get all tokens for this architecture    const allTokens = tokensData      .filter(token => token.architecture === parseInt(architectureId))      .map(token => token.token);    // Find unused tokens    const submittedTokens = forms.map(form => form.token);    const unused = allTokens.filter(token => !submittedTokens.includes(token));    setSubmittedForms(forms);    setUnusedTokens(unused.map(token => ({ token, status: 'Not Submitted' })));    // Update stats    setStats({      totalTokens: allTokens.length,      submittedForms: forms.length,      unusedTokens: unused.length    });  };  const handleArchitectureChange = (e) => {    setSelectedArchId(e.target.value);  };  const getArchitectureName = () => {    const arch = architectures.find(a => a.id === parseInt(selectedArchId));    return arch ? arch.name : 'Unknown Architecture';  };  const formatDate = (timestamp) => {    if (!timestamp) return '-';    try {      const date = new Date(timestamp);      return date.toLocaleDateString('en-US', {        year: 'numeric',        month: 'short',        day: 'numeric',        hour: '2-digit',        minute: '2-digit'      });    } catch {      return '-';    }  };  const handleRetry = () => {    if (selectedArchId) {      fetchArchitectureData(selectedArchId);    } else {      fetchArchitectures();    }  };  // Pagination calculations for submitted tokens  const submittedIndexOfLastRecord = submittedCurrentPage * submittedRecordsPerPage;  const submittedIndexOfFirstRecord = submittedIndexOfLastRecord - submittedRecordsPerPage;  const submittedCurrentRecords = submittedForms.slice(submittedIndexOfFirstRecord, submittedIndexOfLastRecord);  const submittedTotalPages = Math.ceil(submittedForms.length / submittedRecordsPerPage);  // Pagination calculations for unused tokens  const unusedIndexOfLastRecord = unusedCurrentPage * unusedRecordsPerPage;  const unusedIndexOfFirstRecord = unusedIndexOfLastRecord - unusedRecordsPerPage;  const unusedCurrentRecords = unusedTokens.slice(unusedIndexOfFirstRecord, unusedIndexOfLastRecord);  const unusedTotalPages = Math.ceil(unusedTokens.length / unusedRecordsPerPage);  // Pagination component for submitted tokens  const SubmittedPagination = () => {    if (submittedForms.length === 0) return null;    return (      <div className="px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-4 bg-white">        <div className="flex flex-col sm:flex-row items-center gap-2 text-sm">          <span className="text-gray-700">            Showing {submittedIndexOfFirstRecord + 1} to {Math.min(submittedIndexOfLastRecord, submittedForms.length)} of {submittedForms.length} records          </span>          <select            value={submittedRecordsPerPage}            onChange={(e) => {              setSubmittedRecordsPerPage(Number(e.target.value));              setSubmittedCurrentPage(1);            }}            className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"          >            {recordsPerPageOptions.map(option => (              <option key={option} value={option}>                {option} per page              </option>            ))}          </select>        </div>        <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">          <button            onClick={() => setSubmittedCurrentPage(1)}            disabled={submittedCurrentPage === 1}            className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-colors ${              submittedCurrentPage === 1                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'            }`}          >            First          </button>          <button            onClick={() => setSubmittedCurrentPage(prev => Math.max(prev - 1, 1))}            disabled={submittedCurrentPage === 1}            className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-colors ${              submittedCurrentPage === 1                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'            }`}          >            Prev          </button>          <span className="px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium">            Page {submittedCurrentPage} of {submittedTotalPages || 1}          </span>          <button            onClick={() => setSubmittedCurrentPage(prev => Math.min(prev + 1, submittedTotalPages))}            disabled={submittedCurrentPage === submittedTotalPages || submittedTotalPages === 0}            className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-colors ${              submittedCurrentPage === submittedTotalPages || submittedTotalPages === 0                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'            }`}          >            Next          </button>          <button            onClick={() => setSubmittedCurrentPage(submittedTotalPages)}            disabled={submittedCurrentPage === submittedTotalPages || submittedTotalPages === 0}            className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-colors ${              submittedCurrentPage === submittedTotalPages || submittedTotalPages === 0                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'            }`}          >            Last          </button>        </div>      </div>    );  };  // Pagination component for unused tokens  const UnusedPagination = () => {    if (unusedTokens.length === 0) return null;    return (      <div className="px-4 sm:px-6 py-4 border-t flex flex-col sm:flex-row justify-between items-center gap-4 bg-white">        <div className="flex flex-col sm:flex-row items-center gap-2 text-sm">          <span className="text-gray-700">            Showing {unusedIndexOfFirstRecord + 1} to {Math.min(unusedIndexOfLastRecord, unusedTokens.length)} of {unusedTokens.length} records          </span>          <select            value={unusedRecordsPerPage}            onChange={(e) => {              setUnusedRecordsPerPage(Number(e.target.value));              setUnusedCurrentPage(1);            }}            className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"          >            {recordsPerPageOptions.map(option => (              <option key={option} value={option}>                {option} per page              </option>            ))}          </select>        </div>        <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">          <button            onClick={() => setUnusedCurrentPage(1)}            disabled={unusedCurrentPage === 1}            className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-colors ${              unusedCurrentPage === 1                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'            }`}          >            First          </button>          <button            onClick={() => setUnusedCurrentPage(prev => Math.max(prev - 1, 1))}            disabled={unusedCurrentPage === 1}            className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-colors ${              unusedCurrentPage === 1                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'            }`}          >            Prev          </button>          <span className="px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium">            Page {unusedCurrentPage} of {unusedTotalPages || 1}          </span>          <button            onClick={() => setUnusedCurrentPage(prev => Math.min(prev + 1, unusedTotalPages))}            disabled={unusedCurrentPage === unusedTotalPages || unusedTotalPages === 0}            className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-colors ${              unusedCurrentPage === unusedTotalPages || unusedTotalPages === 0                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'            }`}          >            Next          </button>          <button            onClick={() => setUnusedCurrentPage(unusedTotalPages)}            disabled={unusedCurrentPage === unusedTotalPages || unusedTotalPages === 0}            className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm transition-colors ${              unusedCurrentPage === unusedTotalPages || unusedTotalPages === 0                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'            }`}          >            Last          </button>        </div>      </div>    );  };  // Mobile card component for submitted tokens  const SubmittedMobileCard = ({ form }) => {    return (      <div className="border border-gray-200 rounded-lg p-4 mb-3 bg-white shadow-sm">        <div className="flex items-start justify-between mb-3">          <div className="flex items-center">            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">              <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />              </svg>            </div>            <div>              <div className="font-semibold text-gray-900 break-all">{form.token}</div>            </div>          </div>          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">            {form.status}          </span>        </div>        <div className="grid grid-cols-2 gap-3 text-sm">          <div>            <div className="text-xs text-gray-500 mb-1">Submission ID</div>            <div className="font-medium text-gray-900 break-all">{form.submissionId || '-'}</div>          </div>          <div>            <div className="text-xs text-gray-500 mb-1">Date</div>            <div className="font-medium text-gray-900">{formatDate(form.timestamp)}</div>          </div>        </div>      </div>    );  };  // Mobile card component for unused tokens  const UnusedMobileCard = ({ tokenData }) => {    return (      <div className="border border-gray-200 rounded-lg p-4 mb-3 bg-white shadow-sm">        <div className="flex items-start justify-between mb-3">          <div className="flex items-center">            <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center mr-3">              <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />              </svg>            </div>            <div>              <div className="font-semibold text-gray-900 break-all">{tokenData.token}</div>            </div>          </div>          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">            {tokenData.status}          </span>        </div>        <div className="text-sm text-gray-500 text-center bg-amber-50 rounded-lg py-2">          Awaiting Form Submission        </div>      </div>    );  };  // Loading state  if (loading && !selectedArchId) {    return (      <div className="min-h-screen bg-gray-50 py-8 px-4">        <div className="max-w-7xl mx-auto">          <div className="flex justify-center items-center h-64">            <div className="text-center">              <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-blue-500 mx-auto mb-4"></div>              <p className="text-gray-600 font-medium">Loading architectures...</p>            </div>          </div>        </div>      </div>    );  }  // Error state  if (error) {    return (      <div className="min-h-screen bg-gray-50 py-8 px-4">        <div className="max-w-7xl mx-auto">          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />              </svg>            </div>            <h3 className="text-lg font-semibold text-gray-800 mb-2">Error Loading Data</h3>            <p className="text-gray-600 mb-4">{error}</p>            <button              onClick={handleRetry}              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"            >              Try Again            </button>          </div>        </div>      </div>    );  }  return (    <div className="min-h-screen bg-gray-50 py-30 px-4">      <div className="max-w-7xl mx-auto">        {/* Architecture Selector Card */}        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">            <div>              <h2 className="text-lg font-semibold text-gray-900 mb-1">Select Architecture</h2>              <p className="text-gray-500 text-sm">Choose an architecture to view its tokens</p>            </div>            <div className="flex flex-col sm:flex-row gap-3">              <div className="relative">                <select                  id="architecture"                  value={selectedArchId}                  onChange={handleArchitectureChange}                  className="w-full sm:w-64 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white text-gray-900 font-medium"                  disabled={loading}                >                  <option value="">Select Architecture</option>                  {architectures.map(arch => (                    <option key={arch.id} value={arch.id}>                      {arch.name} (ID: {arch.id})                    </option>                  ))}                </select>                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />                  </svg>                </div>              </div>              <button                onClick={handleRetry}                disabled={loading}                className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50"              >                {loading ? (                  <>                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent"></div>                    Loading...                  </>                ) : (                  <>                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />                    </svg>                    Refresh                  </>                )}              </button>            </div>          </div>        </div>        {selectedArchId && (          <>            {/* Stats Grid */}            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">                <div className="flex items-center">                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">                    <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />                    </svg>                  </div>                  <div>                    <p className="text-sm text-gray-500 mb-1">Total Tokens</p>                    <p className="text-2xl font-bold text-gray-900">{stats.totalTokens}</p>                  </div>                </div>              </div>              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">                <div className="flex items-center">                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">                    <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />                    </svg>                  </div>                  <div>                    <p className="text-sm text-gray-500 mb-1">Submitted Tokens</p>                    <p className="text-2xl font-bold text-gray-900">{stats.submittedForms}</p>                  </div>                </div>              </div>              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">                <div className="flex items-center">                  <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center mr-4">                    <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />                    </svg>                  </div>                  <div>                    <p className="text-sm text-gray-500 mb-1">Unused Tokens</p>                    <p className="text-2xl font-bold text-gray-900">{stats.unusedTokens}</p>                  </div>                </div>              </div>            </div>            {/* Submitted Tokens Section */}            <div className="mb-8">              <div className="flex items-center justify-between mb-4">                <div>                  <h2 className="text-xl font-bold text-gray-900">Submitted Tokens</h2>                  <p className="text-gray-500">Tokens that have been used for form submission</p>                </div>                <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">                  {submittedForms.length} tokens                </span>              </div>              {loading ? (                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">                  <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-blue-500 mx-auto mb-4"></div>                  <p className="text-gray-600 font-medium">Loading submitted tokens...</p>                </div>              ) : submittedForms.length > 0 ? (                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">                  {/* Desktop Table */}                  <div className="hidden lg:block overflow-x-auto">                    <table className="w-full">                      <thead className="bg-gray-50 border-b border-gray-200">                        <tr>                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">                            #                          </th>                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">                            Token                          </th>                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">                            Submission ID                          </th>                          {/* <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">                            Submission Date                          </th> */}                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">                            Status                          </th>                        </tr>                      </thead>                      <tbody className="divide-y divide-gray-200">                        {submittedCurrentRecords.map((form, index) => {                          const actualIndex = submittedIndexOfFirstRecord + index + 1;                          return (                            <tr key={form.token} className="hover:bg-gray-50 transition-colors">                              <td className="px-6 py-4 text-sm text-gray-500">{actualIndex}</td>                              <td className="px-6 py-4">                                <div className="flex items-center">                                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">                                    <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />                                    </svg>                                  </div>                                  <div>                                    <div className="font-medium text-gray-900 break-all">{form.token}</div>                                  </div>                                </div>                              </td>                              <td className="px-6 py-4">                                <span className="font-medium text-gray-900 break-all">{form.submissionId || '-'}</span>                              </td>                              {/* <td className="px-6 py-4">                                <div className="text-sm text-gray-900">{formatDate(form.timestamp)}</div>                              </td> */}                              <td className="px-6 py-4">                                <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-medium">                                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />                                  </svg>                                  {form.status}                                </span>                              </td>                            </tr>                          );                        })}                      </tbody>                    </table>                  </div>                  {/* Mobile Cards */}                  <div className="lg:hidden divide-y divide-gray-200">                    {submittedCurrentRecords.map(form => (                      <SubmittedMobileCard key={form.token} form={form} />                    ))}                  </div>                  {/* Pagination */}                  <SubmittedPagination />                </div>              ) : (                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />                    </svg>                  </div>                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Submitted Tokens</h3>                  <p className="text-gray-500">No tokens have been submitted for this architecture yet.</p>                </div>              )}            </div>            {/* Unused Tokens Section */}            <div className="mb-8">              <div className="flex items-center justify-between mb-4">                <div>                  <h2 className="text-xl font-bold text-gray-900">Unused Tokens</h2>                  <p className="text-gray-500">Tokens that haven't been used for form submission</p>                </div>                <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">                  {unusedTokens.length} tokens                </span>              </div>              {loading ? (                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">                  <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-blue-500 mx-auto mb-4"></div>                  <p className="text-gray-600 font-medium">Loading unused tokens...</p>                </div>              ) : unusedTokens.length > 0 ? (                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">                  {/* Desktop Table */}                  <div className="hidden lg:block overflow-x-auto">                    <table className="w-full">                      <thead className="bg-gray-50 border-b border-gray-200">                        <tr>                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">                            #                          </th>                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">                            Token                          </th>                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">                            Status                          </th>                        </tr>                      </thead>                      <tbody className="divide-y divide-gray-200">                        {unusedCurrentRecords.map((tokenData, index) => {                          const actualIndex = unusedIndexOfFirstRecord + index + 1;                          return (                            <tr key={tokenData.token} className="hover:bg-gray-50 transition-colors">                              <td className="px-6 py-4 text-sm text-gray-500">{actualIndex}</td>                              <td className="px-6 py-4">                                <div className="flex items-center">                                  <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">                                    <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />                                    </svg>                                  </div>                                  <div>                                    <div className="font-medium text-gray-900 break-all">{tokenData.token}</div>                                  </div>                                </div>                              </td>                              <td className="px-6 py-4">                                <span className="inline-flex items-center px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-sm font-medium">                                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />                                  </svg>                                  {tokenData.status}                                </span>                              </td>                            </tr>                          );                        })}                      </tbody>                    </table>                  </div>                  {/* Mobile Cards */}                  <div className="lg:hidden divide-y divide-gray-200">                    {unusedCurrentRecords.map(tokenData => (                      <UnusedMobileCard key={tokenData.token} tokenData={tokenData} />                    ))}                  </div>                  {/* Pagination */}                  <UnusedPagination />                </div>              ) : (                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">                    <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />                    </svg>                  </div>                  <h3 className="text-lg font-semibold text-gray-900 mb-2">All Tokens Used</h3>                  <p className="text-gray-500">All tokens have been submitted. Great job!</p>                </div>              )}            </div>          </>        )}        {!selectedArchId && architectures.length > 0 && (          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />              </svg>            </div>            <h3 className="text-lg font-semibold text-gray-900 mb-2">Select an Architecture</h3>            <p className="text-gray-500 mb-4">Choose an architecture from the dropdown to view its tokens</p>            <div className="w-48 h-1 bg-gray-200 rounded-full mx-auto"></div>          </div>        )}      </div>    </div>  );};export default ArchitectureFormTracker;

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -15,14 +14,6 @@ const getAuthToken = () => {
     localStorage.getItem('authToken') ||
     sessionStorage.getItem('access') ||
     sessionStorage.getItem('authToken');
-
-  console.log('Token retrieval debug:', {
-    localStorage_access: localStorage.getItem('access'),
-    localStorage_auth: localStorage.getItem('authToken'),
-    sessionStorage_access: sessionStorage.getItem('access'),
-    sessionStorage_auth: sessionStorage.getItem('authToken'),
-    finalToken: token ? 'Found' : 'Not found'
-  });
 
   return token;
 };
@@ -52,22 +43,18 @@ const refreshAuthToken = async () => {
   try {
     const refreshToken = getRefreshToken();
     if (!refreshToken) {
-      console.log('No refresh token available');
       return null;
     }
 
-    console.log('Attempting to refresh token...');
     const response = await axios.post(`${API_BASE_URL}/api/token/refresh/`, {
       refresh: refreshToken
     });
 
     if (response.data.access) {
       setAuthToken(response.data.access);
-      console.log('Token refreshed successfully');
       return response.data.access;
     }
   } catch (error) {
-    console.error('Token refresh failed:', error);
     clearTokens();
   }
   return null;
@@ -610,7 +597,6 @@ const ArchitectureResponsesView = () => {
     let isMounted = true;
     
     const token = getAuthToken();
-    console.log('Component mounted. Token exists:', !!token);
     
     if (!token) {
       if (isMounted) {
@@ -653,8 +639,6 @@ const ArchitectureResponsesView = () => {
     try {
       if (isMounted) setLoading(true);
       
-      console.log('Making API request to:', `${API_BASE_URL}/api/architecture/${architectureId}/responses/`);
-      
       const token = getAuthToken();
       
       if (!token) {
@@ -672,15 +656,11 @@ const ArchitectureResponsesView = () => {
         },
         timeout: 10000
       };
-      
-      console.log('Making request with token present');
 
       const response = await axios.get(
         `${API_BASE_URL}/api/architecture/${architectureId}/responses/`,
         requestConfig
       );
-
-      console.log('API response received successfully');
       
       if (isMounted) {
         setApiResponse(response.data);
@@ -688,14 +668,10 @@ const ArchitectureResponsesView = () => {
         setError(null);
       }
     } catch (err) {
-      console.error('API Error:', err.response?.status, err.response?.data);
-      
       if (isMounted) {
         if (err.response?.status === 401) {
-          console.log('Received 401, attempting token refresh...');
           const newToken = await refreshAuthToken();
           if (newToken) {
-            console.log('Retrying request with refreshed token...');
             fetchArchitectureResponses(isMounted);
             return;
           } else {
@@ -734,7 +710,6 @@ const ArchitectureResponsesView = () => {
         reader.readAsDataURL(blob);
       });
     } catch (error) {
-      console.error('Error converting image to base64:', error);
       return 'Image not available';
     }
   };
@@ -767,121 +742,6 @@ const ArchitectureResponsesView = () => {
 
     return { staffCount, studentCount };
   };
-
-  // Function to download data as Excel - Only submitted responses with proper date formatting
-  // const downloadExcel = async () => {
-  //   try {
-  //     setDownloading(true);
-      
-  //     if (!data || !data.responses || data.responses.length === 0) {
-  //       alert('No data available to download');
-  //       return;
-  //     }
-
-  //     const groupedResponses = groupResponsesByToken();
-  //     const tokens = getAllTokens();
-  //     const allFieldLabels = [...new Set(data.responses
-  //       .filter(response => response.field_label)
-  //       .map(response => response.field_label))];
-
-  //     const dateFields = new Set();
-  //     data.responses.forEach(response => {
-  //       if (response.field_type === 'date') {
-  //         dateFields.add(response.field_label);
-  //       }
-  //     });
-
-  //     const excelData = [];
-
-  //     for (const token of tokens.submitted) {
-  //       const tokenData = groupedResponses[token];
-  //       const rowData = {
-  //         'Sr. No': excelData.length + 1,
-  //         'Token': token,
-  //         'Submission ID': tokenData.submissionId || '',
-  //         'Timestamp': tokenData.timestamp ? new Date(tokenData.timestamp) : ''
-  //       };
-
-  //       for (const fieldLabel of allFieldLabels) {
-  //         const response = tokenData.responses[fieldLabel];
-  //         if (response) {
-  //           let value = response.value;
-            
-  //           if (response.field_type === 'image' && value && value !== '') {
-  //             try {
-  //               value = await imageToBase64(value);
-  //               rowData[fieldLabel] = value;
-  //             } catch (error) {
-  //               rowData[fieldLabel] = 'Image conversion failed';
-  //             }
-  //           } else if (response.field_type === 'date' && value) {
-  //             const dateValue = new Date(value);
-  //             if (!isNaN(dateValue.getTime())) {
-  //               rowData[fieldLabel] = dateValue;
-  //             } else {
-  //               rowData[fieldLabel] = value;
-  //             }
-  //           } else {
-  //             rowData[fieldLabel] = formatValueForExcel(value, response.field_type);
-  //           }
-  //         } else {
-  //           rowData[fieldLabel] = '-';
-  //         }
-  //       }
-
-  //       excelData.push(rowData);
-  //     }
-
-  //     const ws = XLSX.utils.json_to_sheet(excelData, { skipHeader: false });
-
-  //     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
-      
-  //     const headers = XLSX.utils.sheet_to_json(ws, { header: 1 })[0];
-  //     const dateColumnIndices = [];
-      
-  //     headers.forEach((header, index) => {
-  //       if (dateFields.has(header) || header === 'Timestamp') {
-  //         dateColumnIndices.push(index);
-  //       }
-  //     });
-
-  //     dateColumnIndices.forEach(colIndex => {
-  //       for (let row = range.s.r + 1; row <= range.e.r; row++) {
-  //         const cellAddress = XLSX.utils.encode_cell({ r: row, c: colIndex });
-  //         if (ws[cellAddress] && ws[cellAddress].v instanceof Date) {
-  //           ws[cellAddress].t = 'd';
-  //           ws[cellAddress].z = 'yyyy-mm-dd';
-  //         }
-  //       }
-  //     });
-
-  //     const colWidths = [
-  //       { wch: 8 },
-  //       { wch: 20 },
-  //       { wch: 15 },
-  //       { wch: 20 },
-  //       ...allFieldLabels.map(() => ({ wch: 25 }))
-  //     ];
-  //     ws['!cols'] = colWidths;
-
-  //     const wb = XLSX.utils.book_new();
-  //     XLSX.utils.book_append_sheet(wb, ws, 'Submitted Responses');
-
-  //     const architectureName = data.architecture_name || 'architecture';
-  //     const sanitizedName = architectureName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
-  //     const fileName = `${sanitizedName}_submitted_responses_${architectureId}.xlsx`;
-      
-  //     XLSX.writeFile(wb, fileName);
-
-  //     console.log('Excel file downloaded successfully with proper date formatting');
-
-  //   } catch (error) {
-  //     console.error('Error downloading Excel file:', error);
-  //     alert('Failed to download Excel file. Please try again.');
-  //   } finally {
-  //     setDownloading(false);
-  //   }
-  // };
 
   // Function to download data as Excel with automatic image compression
 const downloadExcel = async () => {
@@ -931,14 +791,11 @@ const downloadExcel = async () => {
               
               // Check if image exceeds Excel limit (32767 characters)
               if (value.length > 30000) { // Leave some buffer
-                console.log(`Image for ${fieldLabel} is too large (${value.length} chars). Compressing...`);
                 value = await compressBase64Image(value, 500, 500, 0.6);
-                console.log(`Compressed to ${value.length} chars`);
               }
               
               rowData[fieldLabel] = value;
             } catch (error) {
-              console.error('Error processing image:', error);
               rowData[fieldLabel] = 'Image conversion failed';
             }
           } else if (response.field_type === 'date' && value) {
@@ -1000,17 +857,14 @@ const downloadExcel = async () => {
     
     XLSX.writeFile(wb, fileName);
 
-    console.log('Excel file downloaded successfully with automatic image compression');
-
   } catch (error) {
-    console.error('Error downloading Excel file:', error);
     alert('Failed to download Excel file. Please try again.');
   } finally {
     setDownloading(false);
   }
 };
 
-// Helper function to compress base64 image (ADD THIS NEW FUNCTION)
+// Helper function to compress base64 image
 const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality = 0.6) => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -1042,13 +896,11 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
       
       // If still too large after first compression, try more aggressive compression
       if (compressedBase64.length > 30000) {
-        console.log('Still too large, applying more compression...');
         // Reduce quality further
         compressedBase64 = canvas.toDataURL('image/jpeg', 0.3);
         
         // If still too large, resize further
         if (compressedBase64.length > 30000) {
-          console.log('Still too large, reducing dimensions...');
           // Reduce dimensions by 50%
           canvas.width = Math.floor(width * 0.5);
           canvas.height = Math.floor(height * 0.5);
@@ -1060,14 +912,10 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
       resolve(compressedBase64);
     };
     img.onerror = () => {
-      console.log('Image compression failed, returning original');
       resolve(base64Str);
     };
   });
 };
-
-// DO NOT ADD imageToBase64 function here - it already exists in your component
-// DO NOT ADD formatValueForExcel function here - it already exists in your component
 
   // Helper function to format values for Excel
   const formatValueForExcel = (value, fieldType) => {
@@ -1110,15 +958,11 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
         withCredentials: true
       };
       
-      console.log('Sending architecture data to admin:', architectureId);
-      
       const response = await axios.post(
         `${API_BASE_URL}/api/customsentoadmin/${architectureId}/`,
         {},
         requestConfig
       );
-      
-      console.log('Send to admin response:', response.data);
       
       setSendStatus({ 
         type: 'success', 
@@ -1130,10 +974,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
       }, 5000);
       
     } catch (err) {
-      console.error('Error sending to admin:', err);
-      console.error('Full error response:', err.response);
-      console.error('Error data:', err.response?.data);
-      
       let errorMessage = 'Failed to send data to admin';
       let showUnusedTokens = false;
       
@@ -1148,9 +988,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
       } else if (err.response?.status === 403) {
         errorMessage = err.response.data?.details || err.response.data?.message || 'Access denied. You can only submit your own data.';
       } else if (err.response?.status === 400) {
-        console.log('400 Error details:', err.response.data);
-        console.log('400 Error data type:', typeof err.response.data);
-        
         if (typeof err.response.data === 'string' && err.response.data.includes('<!DOCTYPE html>')) {
           errorMessage = 'Server returned HTML error page. Check Django server logs for details.';
         } else if (err.response.data && typeof err.response.data === 'object') {
@@ -1217,23 +1054,7 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
         requestConfig
       );
       
-      console.log('Debug - Full response:', response);
-      console.log('Debug - Response data:', response.data);
-      console.log('Debug - Response status:', response.status);
-      
     } catch (err) {
-      console.log('Debug - Full error object:', err);
-      console.log('Debug - Error response:', err.response);
-      console.log('Debug - Error data:', err.response?.data);
-      console.log('Debug - Error status:', err.response?.status);
-      console.log('Debug - Error headers:', err.response?.headers);
-      
-      if (err.response) {
-        console.log('Debug - Response type:', typeof err.response.data);
-        console.log('Debug - Is string?', typeof err.response.data === 'string');
-        console.log('Debug - Response keys:', Object.keys(err.response));
-        console.log('Debug - Data keys:', err.response.data ? Object.keys(err.response.data) : 'No data');
-      }
     }
   };
 
@@ -1263,8 +1084,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
         requestConfig
       );
       
-      console.log('Edit token response:', response.data);
-      
       if (response.data) {
         const processedFields = (response.data.available_fields || []).map(field => {
           let imageWidth = 300;
@@ -1273,8 +1092,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
           const fieldType = (field.type || '').toLowerCase();
           
           if (fieldType === 'image' || fieldType === 'photo' || fieldType === 'picture') {
-            console.log(`Processing image field: ${field.label}`, field.options);
-            
             if (field.options) {
               try {
                 let optionsObj = field.options;
@@ -1298,7 +1115,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
                                imageHeight;
                 }
               } catch (e) {
-                console.log('Could not parse options:', e);
               }
             }
           }
@@ -1312,7 +1128,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
           };
         });
         
-        console.log('Processed fields:', processedFields);
         setEditFormFields(processedFields);
         
         const formData = {};
@@ -1320,12 +1135,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
           response.data.responses.forEach(response => {
             const fieldKey = `field_${response.field_id}`;
             const fieldType = (response.field_type || '').toLowerCase();
-            
-            console.log(`Processing response for field ${response.field_id}:`, {
-              fieldType,
-              value: response.value,
-              rawValue: response.value
-            });
             
             if (fieldType === 'checkbox' || fieldType === 'boolean') {
               formData[fieldKey] = response.value === true || response.value === 'true' || response.value === 1;
@@ -1340,13 +1149,11 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
           });
         }
         
-        console.log('Initialized form data:', formData);
         setEditFormData(formData);
         setIsEditing(true);
       }
       
     } catch (err) {
-      console.error('Error fetching token data for editing:', err);
       if (err.response?.status === 401) {
         const newToken = await refreshAuthToken();
         if (newToken) {
@@ -1374,16 +1181,10 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
   };
 
   const handleInputChange = (fieldId, value) => {
-    console.log('handleInputChange called with:', fieldId, value);
-    setEditFormData(prev => {
-      console.log('Previous editFormData:', prev);
-      const newData = {
-        ...prev,
-        [fieldId]: value
-      };
-      console.log('New editFormData:', newData);
-      return newData;
-    });
+    setEditFormData(prev => ({
+      ...prev,
+      [fieldId]: value
+    }));
   };
 
   const handleEditSubmit = async (e) => {
@@ -1423,15 +1224,11 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
         fieldDefinitions[`field_${field.id}`] = field;
       });
       
-      console.log('Field definitions:', fieldDefinitions);
-      console.log('Current form data before submit:', editFormData);
-      
       Object.keys(editFormData).forEach(key => {
         const value = editFormData[key];
         const fieldDef = fieldDefinitions[key];
         
         if (!fieldDef) {
-          console.log('No field definition for:', key);
           return;
         }
         
@@ -1440,9 +1237,7 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
         if (fieldType === 'image' || fieldType === 'photo' || fieldType === 'picture') {
           if (value && typeof value === 'string' && value.startsWith('data:image')) {
             submitData[key] = value;
-            console.log(`Including NEW image for field ${key} with data length:`, value.length);
           } else {
-            console.log(`Skipping image field ${key} - no new image data, preserving existing`);
           }
         } else if (fieldType === 'checkbox' || fieldType === 'boolean') {
           submitData[key] = value === true;
@@ -1461,8 +1256,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
           }
         }
       });
-      
-      console.log('Submitting data (image fields only included if changed):', submitData);
       
       if (Object.keys(submitData).length === 0) {
         alert('No fields to update');
@@ -1483,8 +1276,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
         requestConfig
       );
       
-      console.log('Update response:', response.data);
-      
       alert('Token responses updated successfully!');
       setIsEditing(false);
       setEditingToken(null);
@@ -1495,9 +1286,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
       fetchArchitectureResponses();
       
     } catch (err) {
-      console.error('Error updating token responses:', err);
-      console.error('Error details:', err.response?.data);
-      
       if (err.response?.status === 401) {
         const newToken = await refreshAuthToken();
         if (newToken) {
@@ -1553,7 +1341,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
         fetchArchitectureResponses();
         alert('Token deleted successfully');
       } catch (err) {
-        console.error('Delete token error:', err);
         alert('Failed to delete token');
       }
     }
@@ -1583,14 +1370,11 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
 
   const cropImageToBox = async (field) => {
     if (!imgRef.current) {
-      console.error('No image reference');
       return null;
     }
 
     const targetWidth = field.imageWidth || 300;
     const targetHeight = field.imageHeight || 300;
-
-    console.log('Cropping image to dimensions:', { targetWidth, targetHeight });
 
     const canvas = document.createElement('canvas');
     canvas.width = targetWidth;
@@ -1599,7 +1383,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
 
     const container = containerRef.current;
     if (!container) {
-      console.error('No container reference');
       return null;
     }
 
@@ -1659,12 +1442,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
         const base64Image = await blobToBase64(blob);
         const fieldKey = `field_${field.id}`;
         
-        console.log('Image processed successfully with dimensions:', {
-          width: field.imageWidth,
-          height: field.imageHeight,
-          dataLength: base64Image.length
-        });
-        
         setEditFormData(prev => ({
           ...prev,
           [fieldKey]: base64Image
@@ -1678,7 +1455,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
         alert(`Image updated successfully! (${field.imageWidth || 300}×${field.imageHeight || 300})`);
       }
     } catch (error) {
-      console.error('Error processing image:', error);
       alert('Failed to process image. Please try again.');
     }
   };
@@ -1715,12 +1491,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
   const renderImageUpload = (field) => {
     const boxWidth = field.imageWidth || 300;
     const boxHeight = field.imageHeight || 300;
-
-    console.log('Rendering image upload for', field.label, 'with dimensions from DB:', { 
-      boxWidth, 
-      boxHeight,
-      rawOptions: field.options 
-    });
 
     return (
       <div className="space-y-3 p-4 border rounded-lg bg-gray-50">
@@ -2497,10 +2267,8 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
       
       if (fieldType === 'email') {
         displayValue = response.value_email;
-        console.log(`Email field ${response.field_label}: value_email =`, response.value_email);
       } else if (fieldType === 'phonenumber' || fieldType === 'phone' || fieldType === 'tel' || fieldType === 'telephone') {
         displayValue = response.value_phonenumber;
-        console.log(`Phone field ${response.field_label}: value_phonenumber =`, response.value_phonenumber);
       } else if (fieldType === 'image' || fieldType === 'photo' || fieldType === 'picture') {
         displayValue = response.value_image;
       } else if (fieldType === 'date') {
@@ -2530,8 +2298,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
   };
 
   const formatValue = (value, fieldType) => {
-    console.log('Formatting value:', { value, fieldType });
-    
     if (value === null || value === undefined || value === '') return '-';
     
     const type = (fieldType || '').toLowerCase().trim();
@@ -2630,7 +2396,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
 
   // Manual retry without any pre-validation
   const manualRetry = () => {
-    console.log('Manual retry - token exists:', !!getAuthToken());
     fetchArchitectureResponses();
   };
 
@@ -2678,7 +2443,7 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
               </div>
               <div className="ml-3">
@@ -2693,8 +2458,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
                   </button>
                   <button
                     onClick={() => {
-                      console.log('Current token:', getAuthToken());
-                      console.log('Token exists:', !!getAuthToken());
                     }}
                     className="px-4 py-2 bg-blue-100 text-blue-700 rounded-md text-sm hover:bg-blue-200"
                   >
@@ -2989,12 +2752,6 @@ const compressBase64Image = (base64Str, maxWidth = 500, maxHeight = 500, quality
                               (() => {
                                 const displayValue = response.displayValue;
                                 const fieldType = response.fieldType;
-                                
-                                console.log(`Rendering ${fieldLabel}:`, {
-                                  fieldType,
-                                  displayValue,
-                                  originalValue: response.value
-                                });
                                 
                                 if (fieldType === 'image' || fieldType === 'photo' || fieldType === 'picture') {
                                   return displayValue ? (

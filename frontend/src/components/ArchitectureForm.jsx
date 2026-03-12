@@ -1,106 +1,1 @@
-// components/ArchitectureForm.jsx
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-
-const ArchitectureForm = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const isEdit = Boolean(id);
-  
-  const [formData, setFormData] = useState({
-    name: '',
-    institution_type: '',
-    parent: '',
-    department_name: '',
-    class_name: '',
-    division: '',
-    student_count: 0,
-    staff_count: 0,
-    is_active: true
-  });
-  const [parents, setParents] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({});
-
-  useEffect(() => {
-    fetchParents();
-    if (isEdit) {
-      fetchArchitectureData();
-    }
-  }, [id]);
-
-  const fetchParents = async () => {
-    try {
-      const response = await axios.get('/api/architecture/');
-      setParents(response.data);
-    } catch (err) {
-      console.error('Failed to fetch parents');
-    }
-  };
-
-  const fetchArchitectureData = async () => {
-    try {
-      const response = await axios.get(`/api/architecture/${id}/`);
-      setFormData(response.data);
-    } catch (err) {
-      console.error('Failed to fetch architecture data');
-      navigate('/architecture/manage');
-    }
-  };
-
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setErrors({});
-    
-    try {
-      if (isEdit) {
-        await axios.put(`/api/architecture/${id}/`, formData);
-      } else {
-        await axios.post('/api/architecture/', formData);
-      }
-      navigate('/architecture/manage');
-    } catch (err) {
-      if (err.response?.data) {
-        setErrors(err.response.data);
-      } else {
-        setErrors({ general: 'Failed to save architecture' });
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="max-w-2xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">
-          {isEdit ? 'Edit' : 'Create'} Architecture Node
-        </h2>
-        <button
-          onClick={() => navigate('/architecture/manage')}
-          className="text-gray-500 hover:text-gray-700"
-        >
-          ✕ Cancel
-        </button>
-      </div>
-
-      {/* Form content remains the same as previous ArchitectureForm */}
-      {/* ... rest of the form code ... */}
-    </div>
-  );
-};
-
-export default ArchitectureForm;
+// components/ArchitectureForm.jsximport React, { useState, useEffect } from 'react';import { useParams, useNavigate } from 'react-router-dom';import axios from 'axios';const ArchitectureForm = () => {  const { id } = useParams();  const navigate = useNavigate();  const isEdit = Boolean(id);  const [formData, setFormData] = useState({    name: '',    institution_type: '',    parent: '',    department_name: '',    class_name: '',    division: '',    student_count: 0,    staff_count: 0,    is_active: true  });  const [parents, setParents] = useState([]);  const [loading, setLoading] = useState(false);  const [errors, setErrors] = useState({});  useEffect(() => {    fetchParents();    if (isEdit) {      fetchArchitectureData();    }  }, [id]);  const fetchParents = async () => {    try {      const response = await axios.get('/api/architecture/');      setParents(response.data);    } catch (err) {    }  };  const fetchArchitectureData = async () => {    try {      const response = await axios.get(`/api/architecture/${id}/`);      setFormData(response.data);    } catch (err) {      navigate('/architecture/manage');    }  };  const handleChange = (e) => {    const { name, value, type, checked } = e.target;    setFormData(prev => ({      ...prev,      [name]: type === 'checkbox' ? checked : value    }));    if (errors[name]) {      setErrors(prev => ({ ...prev, [name]: '' }));    }  };  const handleSubmit = async (e) => {    e.preventDefault();    setLoading(true);    setErrors({});    try {      if (isEdit) {        await axios.put(`/api/architecture/${id}/`, formData);      } else {        await axios.post('/api/architecture/', formData);      }      navigate('/architecture/manage');    } catch (err) {      if (err.response?.data) {        setErrors(err.response.data);      } else {        setErrors({ general: 'Failed to save architecture' });      }    } finally {      setLoading(false);    }  };  return (    <div className="max-w-2xl mx-auto">      <div className="flex items-center justify-between mb-6">        <h2 className="text-2xl font-bold text-gray-800">          {isEdit ? 'Edit' : 'Create'} Architecture Node        </h2>        <button          onClick={() => navigate('/architecture/manage')}          className="text-gray-500 hover:text-gray-700"        >          ✕ Cancel        </button>      </div>      {/* Form content remains the same as previous ArchitectureForm */}      {/* ... rest of the form code ... */}    </div>  );};export default ArchitectureForm;

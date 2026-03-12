@@ -1,1158 +1,1 @@
-
-import { useState, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-
-// Constants
-const ASPECT_RATIOS = [
-  { value: '16:9', label: '16:9 (Widescreen)', width: 1280, height: 720 },
-  { value: '4:3', label: '4:3 (Standard)', width: 1024, height: 768 },
-  { value: '1:1', label: '1:1 (Square)', width: 800, height: 800 },
-  { value: '3:4', label: '3:4 (Portrait)', width: 768, height: 1024 },
-  { value: '9:16', label: '9:16 (Vertical)', width: 720, height: 1280 },
-  { value: 'passport', label: 'Passport (2x2 inch)', width: 600, height: 600 },
-  { value: 'free', label: 'Custom Size', width: 800, height: 600 }
-];
-
-const FIELD_TYPES = [
-  { value: 'text', label: 'Text', icon: '📝' },
-  { value: 'number', label: 'Number', icon: '🔢' },
-  { value: 'date', label: 'Date', icon: '📅' },
-  { value: 'dropdown', label: 'Dropdown', icon: '🔽' },
-  { value: 'checkbox', label: 'Checkbox', icon: '☑️' },
-  { value: 'image', label: 'Image Upload', icon: '🖼️' },
-  { value: 'alphanumeric', label: 'Alphanumeric', icon: '🔤' },
-  { value: 'email', label: 'Email', icon: '📧' },
-  { value: 'phonenumber', label: 'Phone/Mobile', icon: '📱' },
-];
-
-// Validation patterns for different field types
-const VALIDATION_PATTERNS = {
-  text: {
-    pattern: '.*',
-    title: 'Any text is allowed',
-    type: 'text'
-  },
-  number: {
-    pattern: '[0-9]*',
-    title: 'Only numbers are allowed',
-    type: 'number',
-    inputMode: 'numeric'
-  },
-  date: {
-    type: 'date',
-    title: 'Select a date'
-  },
-  dropdown: {
-    type: 'select'
-  },
-  checkbox: {
-    type: 'checkbox'
-  },
-  image: {
-    type: 'file',
-    accept: 'image/*'
-  },
-  alphanumeric: {
-    pattern: '[A-Za-z0-9]*',
-    title: 'Only letters and numbers are allowed (no spaces or special characters)',
-    type: 'text'
-  },
-  email: {
-    pattern: '[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$',
-    title: 'Please enter a valid email address',
-    type: 'email',
-    inputMode: 'email',
-    placeholder: 'example@domain.com'
-  },
-  phonenumber: {
-    pattern: '[+]?[0-9]{10,15}',
-    title: 'Please enter a valid phone number (10-15 digits, optional + prefix)',
-    type: 'tel',
-    inputMode: 'tel',
-    placeholder: '+1234567890'
-  }
-};
-
-const FormBuilder = () => {
-  const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-  });
-  const [fields, setFields] = useState([]);
-  const [currentField, setCurrentField] = useState({
-    label: '',
-    field_type: 'text',
-    is_required: false,
-    is_unique: false,
-    options: '',
-    placeholder: '',
-    order: 0,
-    image_width: 800,
-    image_height: 600,
-    image_ratio: '16:9',
-    validation: {}
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [activeSection, setActiveSection] = useState('details');
-
-  // Memoized API configuration
-  const api = useMemo(() => {
-    const instance = axios.create({
-      baseURL: 'http://localhost:8000/api',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
-
-    // Request interceptor
-    instance.interceptors.request.use(
-      (config) => {
-        const accessToken = localStorage.getItem('access');
-        if (accessToken) {
-          config.headers.Authorization = `Bearer ${accessToken}`;
-        }
-        return config;
-      },
-      (error) => Promise.reject(error)
-    );
-
-    // Response interceptor
-    instance.interceptors.response.use(
-      (response) => response,
-      async (error) => {
-        const originalRequest = error.config;
-
-        if (error.response?.status === 401 && !originalRequest._retry) {
-          originalRequest._retry = true;
-
-          try {
-            const refreshToken = localStorage.getItem('refresh');
-            if (!refreshToken) {
-              throw new Error('No refresh token available');
-            }
-
-            const refreshResponse = await axios.post(
-              'http://localhost:8000/api/token/refresh/',
-              { refresh: refreshToken }
-            );
-
-            const newAccessToken = refreshResponse.data.access;
-            localStorage.setItem('access', newAccessToken);
-            
-            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-            return instance(originalRequest);
-          } catch (refreshError) {
-            localStorage.removeItem('access');
-            localStorage.removeItem('refresh');
-            navigate('/login');
-            return Promise.reject(refreshError);
-          }
-        }
-
-        return Promise.reject(error);
-      }
-    );
-
-    return instance;
-  }, [navigate]);
-
-  // Field management functions
-  const addField = useCallback(() => {
-    if (!currentField.label.trim()) {
-      setError('Please enter a field label');
-      return;
-    }
-
-    console.log('Adding field with type:', currentField.field_type);
-
-    const validationRule = VALIDATION_PATTERNS[currentField.field_type] || VALIDATION_PATTERNS.text;
-
-    const newField = {
-      ...currentField,
-      id: Date.now() + Math.random(),
-      order: fields.length,
-      validation: validationRule,
-      options: currentField.field_type === 'dropdown' ? 
-        { choices: currentField.options.split(',').map(opt => opt.trim()).filter(opt => opt) } : 
-        currentField.field_type === 'image' ?
-        { 
-          width: currentField.image_width,
-          height: currentField.image_height,
-          ratio: currentField.image_ratio
-        } : {}
-    };
-
-    console.log('New field created:', newField);
-
-    setFields(prev => [...prev, newField]);
-    setCurrentField({
-      label: '',
-      field_type: 'text',
-      is_required: false,
-      is_unique: false,
-      options: '',
-      placeholder: '',
-      order: fields.length + 1,
-      image_width: 800,
-      image_height: 600,
-      image_ratio: '16:9',
-      validation: {}
-    });
-    setActiveSection('preview');
-    setError(null);
-  }, [currentField, fields.length]);
-
-  const removeField = useCallback((index) => {
-    setFields(prev => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const moveField = useCallback((index, direction) => {
-    if ((direction === 'up' && index === 0) || 
-        (direction === 'down' && index === fields.length - 1)) {
-      return;
-    }
-
-    setFields(prev => {
-      const newFields = [...prev];
-      const newIndex = direction === 'up' ? index - 1 : index + 1;
-      [newFields[index], newFields[newIndex]] = [newFields[newIndex], newFields[index]];
-      
-      return newFields.map((field, idx) => ({
-        ...field,
-        order: idx
-      }));
-    });
-  }, [fields.length]);
-
-  // Image dimension handlers
-  const handleRatioChange = useCallback((e) => {
-    const selectedRatio = e.target.value;
-    const ratioConfig = ASPECT_RATIOS.find(ratio => ratio.value === selectedRatio);
-    
-    setCurrentField(prev => ({
-      ...prev,
-      image_ratio: selectedRatio,
-      image_width: ratioConfig.width,
-      image_height: ratioConfig.height
-    }));
-  }, []);
-
-  // const handleDimensionChange = useCallback((dimension, value) => {
-  //   if (value === '') {
-  //     setCurrentField(prev => ({
-  //       ...prev,
-  //       [dimension === 'width' ? 'image_width' : 'image_height']: ''
-  //     }));
-  //     return;
-  //   }
-    
-  //   const numValue = parseInt(value) || 0;
-  //   const clampedValue = Math.min(Math.max(numValue, 100), 4000);
-    
-  //   setCurrentField(prev => ({
-  //     ...prev,
-  //     [dimension === 'width' ? 'image_width' : 'image_height']: clampedValue
-  //   }));
-  // }, []);
-const handleDimensionChange = useCallback((dimension, value) => {
-  // Allow empty string while typing
-  if (value === '') {
-    setCurrentField(prev => ({
-      ...prev,
-      [dimension === 'width' ? 'image_width' : 'image_height']: ''
-    }));
-    return;
-  }
-  
-  // Allow partial numbers while typing (like "1" when trying to type "150")
-  // This prevents immediate clamping that blocks typing
-  setCurrentField(prev => ({
-    ...prev,
-    [dimension === 'width' ? 'image_width' : 'image_height']: value
-  }));
-}, []);
-
-// Add this function for blur validation
-const handleDimensionBlur = useCallback((dimension) => {
-  setCurrentField(prev => {
-    const currentValue = prev[dimension === 'width' ? 'image_width' : 'image_height'];
-    
-    // If empty or invalid, set to minimum
-    if (currentValue === '' || currentValue === null || currentValue === undefined) {
-      return {
-        ...prev,
-        [dimension === 'width' ? 'image_width' : 'image_height']: 100
-      };
-    }
-    
-    // Convert to number and clamp
-    const numValue = parseInt(currentValue) || 0;
-    const clampedValue = Math.min(Math.max(numValue, 100), 4000);
-    
-    return {
-      ...prev,
-      [dimension === 'width' ? 'image_width' : 'image_height']: clampedValue
-    };
-  });
-}, []);
-  // API functions
-  const createForm = useCallback(async (formData) => {
-    try {
-      const response = await api.post('/forms/', formData);
-      return response.data;
-    } catch (error) {
-      if (error.response?.status === 401) {
-        throw new Error('Authentication failed. Please log in again.');
-      } else if (error.response?.status === 400) {
-        const errorData = error.response.data;
-        if (errorData.title) {
-          throw new Error(`Form title error: ${errorData.title.join(', ')}`);
-        }
-        throw new Error('Invalid form data. Please check your inputs.');
-      } else if (error.response?.status === 403) {
-        throw new Error('You do not have permission to create forms.');
-      }
-      throw new Error('Failed to create form. Please try again.');
-    }
-  }, [api]);
-
-  const createFormFields = useCallback(async (formId, fieldsData) => {
-    try {
-      const promises = fieldsData.map(field => 
-        api.post('/form-fields/', { ...field, form: formId })
-      );
-      await Promise.all(promises);
-    } catch (error) {
-      if (error.response?.status === 401) {
-        throw new Error('Authentication failed while creating fields.');
-      }
-      throw new Error('Failed to create form fields. Please try again.');
-    }
-  }, [api]);
-
-  // Form submission
-  const handleSubmit = useCallback(async (e) => {
-    e.preventDefault();
-    
-    const accessToken = localStorage.getItem('access');
-    if (!accessToken) {
-      setError('Please log in to create forms.');
-      setTimeout(() => navigate('/login'), 2000);
-      return;
-    }
-
-    if (!formData.title.trim()) {
-      setError('Please enter a form title');
-      return;
-    }
-
-    if (fields.length === 0) {
-      setError('Please add at least one field to the form');
-      return;
-    }
-
-    console.log('Submitting form with fields:', fields.map(f => ({
-      label: f.label,
-      field_type: f.field_type,
-      validation: f.validation
-    })));
-
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const formResponse = await createForm(formData);
-      const formId = formResponse.id;
-
-      const fieldsToCreate = fields.map(({ id, ...field }) => ({
-        ...field,
-        form: formId
-      }));
-
-      await createFormFields(formId, fieldsToCreate);
-      
-      setFormData({ title: '', description: '' });
-      setFields([]);
-      setSuccess('Form created successfully! Redirecting to forms...');
-      
-      setTimeout(() => navigate('/forms'), 2000);
-      
-    } catch (err) {
-      setError(err.message);
-      console.error('Error creating form:', err);
-      
-      if (err.message.includes('Authentication failed')) {
-        setTimeout(() => navigate('/login'), 2000);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [formData, fields, createForm, createFormFields, navigate]);
-
-  const isCustomSize = currentField.image_ratio === 'free';
-
-  // Helper function to get validation pattern for preview
-  const getInputProps = (field) => {
-    const validation = VALIDATION_PATTERNS[field.field_type] || VALIDATION_PATTERNS.text;
-    return {
-      type: validation.type || 'text',
-      pattern: validation.pattern,
-      title: validation.title,
-      inputMode: validation.inputMode,
-      placeholder: field.placeholder || validation.placeholder || `Enter ${field.label.toLowerCase()}`
-    };
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 mt-20">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-800">Form Builder</h1>
-              <p className="text-gray-600 mt-2">Create beautiful forms with custom fields</p>
-            </div>
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => navigate('/forms')}
-                className="px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 flex items-center gap-2 text-gray-700 font-medium shadow-sm"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-                </svg>
-                View Forms
-              </button>
-              <div className="px-4 py-2 bg-blue-50 rounded-lg border border-blue-100">
-                <span className="text-sm font-medium text-blue-700">
-                  {fields.length} field{fields.length !== 1 ? 's' : ''} added
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Progress Steps */}
-          <div className="mt-8 flex items-center justify-center">
-            <div className="flex items-center space-x-4">
-              {['details', 'fields', 'preview'].map((step, index) => (
-                <div key={step} className="flex items-center">
-                  <button
-                    onClick={() => setActiveSection(step)}
-                    className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all duration-300 ${
-                      activeSection === step 
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' 
-                        : step === 'preview' && fields.length === 0
-                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                        : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
-                    }`}
-                    disabled={step === 'preview' && fields.length === 0}
-                  >
-                    {index + 1}
-                  </button>
-                  {index < 2 && (
-                    <div className={`w-16 h-1 ${
-                      activeSection === step || (index === 0 && activeSection === 'fields')
-                        ? 'bg-blue-500' : 'bg-gray-300'
-                    }`} />
-                  )}
-                </div>
-              ))}
-              <div className="ml-6 hidden md:block">
-                <span className="text-sm font-medium text-gray-600">
-                  {activeSection === 'details' && 'Form Details'}
-                  {activeSection === 'fields' && 'Add Fields'}
-                  {activeSection === 'preview' && 'Preview & Submit'}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Alert Messages */}
-        <div className="mb-6 space-y-3">
-          {error && (
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm animate-fadeIn">
-              <div className="flex items-start">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-red-800">{error}</p>
-                </div>
-                <button
-                  onClick={() => setError(null)}
-                  className="ml-auto -mx-1.5 -my-1.5 text-red-500 hover:text-red-700"
-                >
-                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {success && (
-            <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg shadow-sm animate-fadeIn">
-              <div className="flex items-start">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-green-800">{success}</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Form Details & Field Builder */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Form Details Card */}
-            <div className={`bg-white rounded-xl shadow-lg border border-gray-200 transition-all duration-300 ${activeSection !== 'details' ? 'opacity-60' : ''}`}>
-              <div 
-                className="p-6 cursor-pointer"
-                onClick={() => setActiveSection('details')}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <span className="p-2 bg-blue-100 rounded-lg">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                      </svg>
-                    </span>
-                    Form Details
-                  </h3>
-                  <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                    Required
-                  </span>
-                </div>
-                <div className="space-y-5">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Form Title <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.title}
-                      onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"
-                      placeholder="Enter a descriptive title for your form"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Description
-                    </label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"
-                      rows={3}
-                      placeholder="Describe what this form is for (optional)"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Field Builder Card */}
-            <div className={`bg-white rounded-xl shadow-lg border border-gray-200 transition-all duration-300 ${activeSection !== 'fields' ? 'opacity-60' : ''}`}>
-              <div 
-                className="p-6 cursor-pointer"
-                onClick={() => setActiveSection('fields')}
-              >
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <span className="p-2 bg-purple-100 rounded-lg">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-purple-600" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 3a1 1 0 00-1 1v5H4a1 1 0 100 2h5v5a1 1 0 102 0v-5h5a1 1 0 100-2h-5V4a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                    </span>
-                    Add New Field
-                  </h3>
-                  <span className="text-sm font-medium text-gray-500">
-                    Step 2 of 3
-                  </span>
-                </div>
-
-                <div className="space-y-5">
-                  {/* Field Label */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Field Label <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={currentField.label}
-                      onChange={(e) => setCurrentField(prev => ({ ...prev, label: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"
-                      placeholder="What should this field be called?"
-                    />
-                  </div>
-
-                  {/* Field Type Selection */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">
-                      Field Type
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                      {FIELD_TYPES.map(type => (
-                        <button
-                          key={type.value}
-                          type="button"
-                          onClick={() => setCurrentField(prev => ({ ...prev, field_type: type.value }))}
-                          className={`p-4 rounded-lg border transition-all duration-200 flex flex-col items-center gap-2 ${
-                            currentField.field_type === type.value
-                              ? 'border-blue-500 bg-blue-50 shadow-sm ring-2 ring-blue-200'
-                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span className="text-2xl">{type.icon}</span>
-                          <span className="text-sm font-medium text-gray-700">{type.label}</span>
-                          {currentField.field_type === type.value && (
-                            <span className="text-xs text-blue-600 font-semibold">Selected</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Validation Info */}
-                  {currentField.field_type && currentField.field_type !== 'dropdown' && 
-                   currentField.field_type !== 'checkbox' && 
-                   currentField.field_type !== 'image' && (
-                    <div className="bg-blue-50 p-3 rounded-lg">
-                      <p className="text-xs text-blue-700">
-                        <span className="font-semibold">Validation: </span>
-                        {VALIDATION_PATTERNS[currentField.field_type]?.title}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Conditional Fields */}
-                  <div className="space-y-4">
-                    {currentField.field_type === 'dropdown' && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Dropdown Options
-                        </label>
-                        <input
-                          type="text"
-                          value={currentField.options}
-                          onChange={(e) => setCurrentField(prev => ({ ...prev, options: e.target.value }))}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"
-                          placeholder="Option 1, Option 2, Option 3"
-                        />
-                        <p className="text-xs text-gray-500 mt-2">Separate options with commas</p>
-                      </div>
-                    )}
-
-                    {currentField.field_type === 'image' && (
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Image Specifications
-                          </label>
-                          <select
-                            value={currentField.image_ratio}
-                            onChange={handleRatioChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"
-                          >
-                            {ASPECT_RATIOS.map(ratio => (
-                              <option key={ratio.value} value={ratio.value}>
-                                {ratio.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {isCustomSize && (
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Width (px)
-                              </label>
-                              <input
-  type="number"
-  value={currentField.image_width}
-  onChange={(e) => {
-    // Allow empty input while typing
-    const value = e.target.value;
-    if (value === '') {
-      handleDimensionChange('width', '');
-    } else {
-      handleDimensionChange('width', Number(value));
-    }
-  }}
-  onBlur={(e) => {
-    // Validate on blur to ensure minimum value
-    if (e.target.value === '' || Number(e.target.value) < 100) {
-      handleDimensionChange('width', 100);
-    }
-  }}
-  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"
-  min="100"
-  max="4000"
-  step="1"
-/>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Height (px)
-                              </label>
-                              <input
-                                type="number"
-                                value={currentField.image_height}
-                                onChange={(e) => handleDimensionChange('height', e.target.value)}
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"
-                                min="100"
-                                max="4000"
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Size Preview */}
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="text-sm font-medium text-gray-700">Preview</span>
-                            <span className="text-sm text-gray-500">
-                              {currentField.image_width} × {currentField.image_height}px
-                            </span>
-                          </div>
-                          <div className="flex justify-center">
-                            <div 
-                              className="bg-gradient-to-br from-blue-100 to-blue-200 border-2 border-dashed border-blue-300 flex items-center justify-center rounded-lg"
-                              style={{ 
-                                width: '120px',
-                                height: `${120 * (currentField.image_height / currentField.image_width)}px`,
-                                maxHeight: '120px'
-                              }}
-                            >
-                              <div className="text-center">
-                                <div className="text-xs font-medium text-blue-700">
-                                  {Math.round(currentField.image_width)}×{Math.round(currentField.image_height)}
-                                </div>
-                                <div className="text-xs text-blue-600">
-                                  {currentField.image_ratio}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Placeholder - Show for all except checkbox, dropdown, image */}
-                    {currentField.field_type !== 'checkbox' && 
-                     currentField.field_type !== 'dropdown' && 
-                     currentField.field_type !== 'image' && (
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Placeholder Text
-                        </label>
-                        <input
-                          type="text"
-                          value={currentField.placeholder}
-                          onChange={(e) => setCurrentField(prev => ({ ...prev, placeholder: e.target.value }))}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"
-                          placeholder={VALIDATION_PATTERNS[currentField.field_type]?.placeholder || "Enter placeholder text"}
-                        />
-                      </div>
-                    )}
-
-                    {/* Field Options */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
-                        <div className="relative">
-                          <input
-                            type="checkbox"
-                            checked={currentField.is_required}
-                            onChange={(e) => setCurrentField(prev => ({ ...prev, is_required: e.target.checked }))}
-                            className="sr-only"
-                          />
-                          <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
-                            currentField.is_required 
-                              ? 'bg-blue-500 border-blue-500' 
-                              : 'border-gray-300'
-                          }`}>
-                            {currentField.is_required && (
-                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </div>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-700">Required Field</span>
-                          <p className="text-xs text-gray-500">User must fill this field</p>
-                        </div>
-                      </label>
-
-                      <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
-                        <div className="relative">
-                          <input
-                            type="checkbox"
-                            checked={currentField.is_unique}
-                            onChange={(e) => setCurrentField(prev => ({ ...prev, is_unique: e.target.checked }))}
-                            className="sr-only"
-                          />
-                          <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
-                            currentField.is_unique 
-                              ? 'bg-green-500 border-green-500' 
-                              : 'border-gray-300'
-                          }`}>
-                            {currentField.is_unique && (
-                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </div>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-700">Unique Value</span>
-                          <p className="text-xs text-gray-500">No duplicate values allowed</p>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Add Field Button */}
-                  <button
-                    onClick={addField}
-                    disabled={!currentField.label.trim()}
-                    className="w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-purple-100"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 3a1 1 0 00-1 1v5H4a1 1 0 100 2h5v5a1 1 0 102 0v-5h5a1 1 0 100-2h-5V4a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    Add Field to Form
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column - Preview & Submit */}
-          <div className="space-y-6">
-            {/* Preview Card */}
-            <div className={`bg-white rounded-xl shadow-lg border border-gray-200 transition-all duration-300 ${activeSection !== 'preview' ? 'opacity-60' : ''}`}>
-              <div 
-                className="p-6 cursor-pointer"
-                onClick={() => fields.length > 0 && setActiveSection('preview')}
-              >
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <span className="p-2 bg-green-100 rounded-lg">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                        <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                      </svg>
-                    </span>
-                    Form Preview
-                  </h3>
-                  <span className="text-sm font-medium text-green-600 bg-green-50 px-3 py-1 rounded-full">
-                    {fields.length} Fields
-                  </span>
-                </div>
-
-                {fields.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="text-gray-400 mb-3">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                    <p className="text-gray-500 font-medium">No fields added yet</p>
-                    <p className="text-sm text-gray-400 mt-1">Add fields from the left panel</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {/* Form Preview Header */}
-                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg mb-4">
-                      <h4 className="font-bold text-gray-800 text-lg">{formData.title || 'Untitled Form'}</h4>
-                      {formData.description && (
-                        <p className="text-sm text-gray-600 mt-1">{formData.description}</p>
-                      )}
-                    </div>
-
-                    {/* Fields Preview */}
-                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                      {fields.map((field, index) => {
-                        const inputProps = getInputProps(field);
-                        return (
-                          <div key={field.id} className="group border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-all duration-200 bg-white">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span className="text-lg">{FIELD_TYPES.find(t => t.value === field.field_type)?.icon}</span>
-                                  <span className="font-semibold text-gray-800">{field.label}</span>
-                                  <div className="flex items-center gap-1 flex-wrap">
-                                    {field.is_required && (
-                                      <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Required</span>
-                                    )}
-                                    {field.is_unique && (
-                                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Unique</span>
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                {/* Field Preview */}
-                                <div className="ml-7 space-y-2">
-                                  {/* Text Field */}
-                                  {field.field_type === 'text' && (
-                                    <input
-                                      type="text"
-                                      placeholder={inputProps.placeholder}
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                      disabled
-                                    />
-                                  )}
-
-                                  {/* Number Field */}
-                                  {field.field_type === 'number' && (
-                                    <input
-                                      type="number"
-                                      placeholder={inputProps.placeholder}
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                      disabled
-                                    />
-                                  )}
-
-                                  {/* Date Field */}
-                                  {field.field_type === 'date' && (
-                                    <input
-                                      type="date"
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                      disabled
-                                    />
-                                  )}
-
-                                  {/* Dropdown Field */}
-                                  {field.field_type === 'dropdown' && (
-                                    <select className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500" disabled>
-                                      <option>{field.placeholder || `Select ${field.label.toLowerCase()}`}</option>
-                                      {field.options?.choices?.map((choice, i) => (
-                                        <option key={i}>{choice}</option>
-                                      ))}
-                                    </select>
-                                  )}
-
-                                  {/* Checkbox Field */}
-                                  {field.field_type === 'checkbox' && (
-                                    <label className="flex items-center gap-2">
-                                      <input type="checkbox" className="rounded border-gray-300" disabled />
-                                      <span className="text-sm text-gray-600">{field.placeholder || `Check ${field.label.toLowerCase()}`}</span>
-                                    </label>
-                                  )}
-
-                                  {/* Image Upload Field */}
-                                  {field.field_type === 'image' && (
-                                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center">
-                                      <div className="text-gray-400 mb-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                      </div>
-                                      <p className="text-xs text-gray-500">Upload image ({field.options?.width || 800}×{field.options?.height || 600}px)</p>
-                                      <p className="text-xs text-gray-400 mt-1">JPG, PNG, GIF up to 5MB</p>
-                                    </div>
-                                  )}
-
-                                  {/* Alphanumeric Field */}
-                                  {field.field_type === 'alphanumeric' && (
-                                    <div>
-                                      <input
-                                        type="text"
-                                        pattern="[A-Za-z0-9]*"
-                                        placeholder={inputProps.placeholder}
-                                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                                        title="Only letters and numbers are allowed"
-                                        disabled
-                                      />
-                                      <p className="text-xs text-gray-500 mt-1">Only letters and numbers allowed</p>
-                                    </div>
-                                  )}
-
-                                  {/* Email Field */}
-                                  {field.field_type === 'email' && (
-                                    <div>
-                                      <div className="relative">
-                                        <input
-                                          type="email"
-                                          placeholder={inputProps.placeholder}
-                                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 pl-8"
-                                          pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
-                                          title="Please enter a valid email address"
-                                          disabled
-                                        />
-                                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">
-                                          📧
-                                        </span>
-                                      </div>
-                                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                                        <span className="inline-block w-4 h-4 bg-green-100 rounded-full text-green-600 text-center leading-4 text-[10px]">✓</span>
-                                        Format: name@example.com
-                                      </p>
-                                      <p className="text-xs text-gray-400 mt-0.5 ml-5">Example: john.doe@company.com</p>
-                                    </div>
-                                  )}
-
-                                  {/* Phone Number Field */}
-                                  {(field.field_type === 'phonenumber') && (
-                                    <div>
-                                      <div className="relative">
-                                        <input
-                                          type="tel"
-                                          placeholder={inputProps.placeholder}
-                                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 pl-8"
-                                          pattern="[+]?[0-9]{10,15}"
-                                          title="Please enter a valid phone number (10-15 digits, optional + prefix)"
-                                          inputMode="tel"
-                                          disabled
-                                        />
-                                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">
-                                          📱
-                                        </span>
-                                      </div>
-                                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                                        <span className="inline-block w-4 h-4 bg-green-100 rounded-full text-green-600 text-center leading-4 text-[10px]">✓</span>
-                                        Format: +1234567890 (10-15 digits)
-                                      </p>
-                                      <p className="text-xs text-gray-400 mt-0.5 ml-5">Example: +1234567890 or 1234567890</p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              
-                              {/* Field Actions */}
-                              <div className="flex items-center gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={() => moveField(index, 'up')}
-                                  disabled={index === 0}
-                                  className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-30"
-                                  title="Move up"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                                <button
-                                  onClick={() => moveField(index, 'down')}
-                                  disabled={index === fields.length - 1}
-                                  className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-30"
-                                  title="Move down"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                                <button
-                                  onClick={() => removeField(index)}
-                                  className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                  title="Remove"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Submit Card */}
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl shadow-xl p-6">
-              <h3 className="text-xl font-bold text-white mb-2">Ready to Create</h3>
-              <p className="text-gray-300 text-sm mb-6">
-                Review your form and submit when ready. All changes are saved automatically.
-              </p>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-300">Form Title</span>
-                  <span className="font-medium text-white">{formData.title || 'Not set'}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-300">Fields Added</span>
-                  <span className="font-medium text-white">{fields.length}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-300">Required Fields</span>
-                  <span className="font-medium text-white">{fields.filter(f => f.is_required).length}</span>
-                </div>
-                
-                <div className="pt-4 border-t border-gray-700">
-                  <button
-                    onClick={handleSubmit}
-                    disabled={loading || !formData.title.trim() || fields.length === 0 || !localStorage.getItem('access')}
-                    className="w-full py-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-green-900/30"
-                  >
-                    {loading ? (
-                      <>
-                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Creating Form...
-                      </>
-                    ) : (
-                      <>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                        Create Form
-                      </>
-                    )}
-                  </button>
-                  
-                  <p className="text-xs text-gray-400 text-center mt-3">
-                    {!localStorage.getItem('access') 
-                      ? 'Please log in to create forms' 
-                      : fields.length === 0 
-                        ? 'Add at least one field to continue'
-                        : 'Click to publish your form'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer Help Text */}
-        <div className="mt-8 text-center text-gray-500 text-sm">
-          <p>Need help? Fields are saved automatically. You can reorder them using the up/down arrows.</p>
-        </div>
-      </div>
-
-      {/* Add custom animations */}
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out;
-        }
-      `}</style>
-    </div>
-  );
-};
-
-export default FormBuilder;
+import { useState, useCallback, useMemo } from 'react';import { useNavigate } from 'react-router-dom';import axios from 'axios';// Constantsconst ASPECT_RATIOS = [  { value: '16:9', label: '16:9 (Widescreen)', width: 1280, height: 720 },  { value: '4:3', label: '4:3 (Standard)', width: 1024, height: 768 },  { value: '1:1', label: '1:1 (Square)', width: 800, height: 800 },  { value: '3:4', label: '3:4 (Portrait)', width: 768, height: 1024 },  { value: '9:16', label: '9:16 (Vertical)', width: 720, height: 1280 },  { value: 'passport', label: 'Passport (2x2 inch)', width: 600, height: 600 },  { value: 'free', label: 'Custom Size', width: 800, height: 600 }];const FIELD_TYPES = [  { value: 'text', label: 'Text', icon: '📝' },  { value: 'number', label: 'Number', icon: '🔢' },  { value: 'date', label: 'Date', icon: '📅' },  { value: 'dropdown', label: 'Dropdown', icon: '🔽' },  { value: 'checkbox', label: 'Checkbox', icon: '☑️' },  { value: 'image', label: 'Image Upload', icon: '🖼️' },  { value: 'alphanumeric', label: 'Alphanumeric', icon: '🔤' },  { value: 'email', label: 'Email', icon: '📧' },  { value: 'phonenumber', label: 'Phone/Mobile', icon: '📱' },];// Validation patterns for different field typesconst VALIDATION_PATTERNS = {  text: {    pattern: '.*',    title: 'Any text is allowed',    type: 'text'  },  number: {    pattern: '[0-9]*',    title: 'Only numbers are allowed',    type: 'number',    inputMode: 'numeric'  },  date: {    type: 'date',    title: 'Select a date'  },  dropdown: {    type: 'select'  },  checkbox: {    type: 'checkbox'  },  image: {    type: 'file',    accept: 'image/*'  },  alphanumeric: {    pattern: '[A-Za-z0-9]*',    title: 'Only letters and numbers are allowed (no spaces or special characters)',    type: 'text'  },  email: {    pattern: '[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$',    title: 'Please enter a valid email address',    type: 'email',    inputMode: 'email',    placeholder: 'example@domain.com'  },  phonenumber: {    pattern: '[+]?[0-9]{10,15}',    title: 'Please enter a valid phone number (10-15 digits, optional + prefix)',    type: 'tel',    inputMode: 'tel',    placeholder: '+1234567890'  }};const FormBuilder = () => {  const navigate = useNavigate();  const [formData, setFormData] = useState({    title: '',    description: '',  });  const [fields, setFields] = useState([]);  const [currentField, setCurrentField] = useState({    label: '',    field_type: 'text',    is_required: false,    is_unique: false,    options: '',    placeholder: '',    order: 0,    image_width: 800,    image_height: 600,    image_ratio: '16:9',    validation: {}  });  const [loading, setLoading] = useState(false);  const [error, setError] = useState(null);  const [success, setSuccess] = useState(null);  const [activeSection, setActiveSection] = useState('details');  // Memoized API configuration  const api = useMemo(() => {    const instance = axios.create({      baseURL: 'http://localhost:8000/api',      headers: {        'Content-Type': 'application/json',      }    });    // Request interceptor    instance.interceptors.request.use(      (config) => {        const accessToken = localStorage.getItem('access');        if (accessToken) {          config.headers.Authorization = `Bearer ${accessToken}`;        }        return config;      },      (error) => Promise.reject(error)    );    // Response interceptor    instance.interceptors.response.use(      (response) => response,      async (error) => {        const originalRequest = error.config;        if (error.response?.status === 401 && !originalRequest._retry) {          originalRequest._retry = true;          try {            const refreshToken = localStorage.getItem('refresh');            if (!refreshToken) {              throw new Error('No refresh token available');            }            const refreshResponse = await axios.post(              'http://localhost:8000/api/token/refresh/',              { refresh: refreshToken }            );            const newAccessToken = refreshResponse.data.access;            localStorage.setItem('access', newAccessToken);            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;            return instance(originalRequest);          } catch (refreshError) {            localStorage.removeItem('access');            localStorage.removeItem('refresh');            navigate('/login');            return Promise.reject(refreshError);          }        }        return Promise.reject(error);      }    );    return instance;  }, [navigate]);  // Field management functions  const addField = useCallback(() => {    if (!currentField.label.trim()) {      setError('Please enter a field label');      return;    }    const validationRule = VALIDATION_PATTERNS[currentField.field_type] || VALIDATION_PATTERNS.text;    const newField = {      ...currentField,      id: Date.now() + Math.random(),      order: fields.length,      validation: validationRule,      options: currentField.field_type === 'dropdown' ?         { choices: currentField.options.split(',').map(opt => opt.trim()).filter(opt => opt) } :         currentField.field_type === 'image' ?        {           width: currentField.image_width,          height: currentField.image_height,          ratio: currentField.image_ratio        } : {}    };    setFields(prev => [...prev, newField]);    setCurrentField({      label: '',      field_type: 'text',      is_required: false,      is_unique: false,      options: '',      placeholder: '',      order: fields.length + 1,      image_width: 800,      image_height: 600,      image_ratio: '16:9',      validation: {}    });    setActiveSection('preview');    setError(null);  }, [currentField, fields.length]);  const removeField = useCallback((index) => {    setFields(prev => prev.filter((_, i) => i !== index));  }, []);  const moveField = useCallback((index, direction) => {    if ((direction === 'up' && index === 0) ||         (direction === 'down' && index === fields.length - 1)) {      return;    }    setFields(prev => {      const newFields = [...prev];      const newIndex = direction === 'up' ? index - 1 : index + 1;      [newFields[index], newFields[newIndex]] = [newFields[newIndex], newFields[index]];      return newFields.map((field, idx) => ({        ...field,        order: idx      }));    });  }, [fields.length]);  // Image dimension handlers  const handleRatioChange = useCallback((e) => {    const selectedRatio = e.target.value;    const ratioConfig = ASPECT_RATIOS.find(ratio => ratio.value === selectedRatio);    setCurrentField(prev => ({      ...prev,      image_ratio: selectedRatio,      image_width: ratioConfig.width,      image_height: ratioConfig.height    }));  }, []);  // const handleDimensionChange = useCallback((dimension, value) => {  //   if (value === '') {  //     setCurrentField(prev => ({  //       ...prev,  //       [dimension === 'width' ? 'image_width' : 'image_height']: ''  //     }));  //     return;  //   }  //   const numValue = parseInt(value) || 0;  //   const clampedValue = Math.min(Math.max(numValue, 100), 4000);  //   setCurrentField(prev => ({  //     ...prev,  //     [dimension === 'width' ? 'image_width' : 'image_height']: clampedValue  //   }));  // }, []);const handleDimensionChange = useCallback((dimension, value) => {  // Allow empty string while typing  if (value === '') {    setCurrentField(prev => ({      ...prev,      [dimension === 'width' ? 'image_width' : 'image_height']: ''    }));    return;  }  // Allow partial numbers while typing (like "1" when trying to type "150")  // This prevents immediate clamping that blocks typing  setCurrentField(prev => ({    ...prev,    [dimension === 'width' ? 'image_width' : 'image_height']: value  }));}, []);// Add this function for blur validationconst handleDimensionBlur = useCallback((dimension) => {  setCurrentField(prev => {    const currentValue = prev[dimension === 'width' ? 'image_width' : 'image_height'];    // If empty or invalid, set to minimum    if (currentValue === '' || currentValue === null || currentValue === undefined) {      return {        ...prev,        [dimension === 'width' ? 'image_width' : 'image_height']: 100      };    }    // Convert to number and clamp    const numValue = parseInt(currentValue) || 0;    const clampedValue = Math.min(Math.max(numValue, 100), 4000);    return {      ...prev,      [dimension === 'width' ? 'image_width' : 'image_height']: clampedValue    };  });}, []);  // API functions  const createForm = useCallback(async (formData) => {    try {      const response = await api.post('/forms/', formData);      return response.data;    } catch (error) {      if (error.response?.status === 401) {        throw new Error('Authentication failed. Please log in again.');      } else if (error.response?.status === 400) {        const errorData = error.response.data;        if (errorData.title) {          throw new Error(`Form title error: ${errorData.title.join(', ')}`);        }        throw new Error('Invalid form data. Please check your inputs.');      } else if (error.response?.status === 403) {        throw new Error('You do not have permission to create forms.');      }      throw new Error('Failed to create form. Please try again.');    }  }, [api]);  const createFormFields = useCallback(async (formId, fieldsData) => {    try {      const promises = fieldsData.map(field =>         api.post('/form-fields/', { ...field, form: formId })      );      await Promise.all(promises);    } catch (error) {      if (error.response?.status === 401) {        throw new Error('Authentication failed while creating fields.');      }      throw new Error('Failed to create form fields. Please try again.');    }  }, [api]);  // Form submission  const handleSubmit = useCallback(async (e) => {    e.preventDefault();    const accessToken = localStorage.getItem('access');    if (!accessToken) {      setError('Please log in to create forms.');      setTimeout(() => navigate('/login'), 2000);      return;    }    if (!formData.title.trim()) {      setError('Please enter a form title');      return;    }    if (fields.length === 0) {      setError('Please add at least one field to the form');      return;    }    setLoading(true);    setError(null);    setSuccess(null);    try {      const formResponse = await createForm(formData);      const formId = formResponse.id;      const fieldsToCreate = fields.map(({ id, ...field }) => ({        ...field,        form: formId      }));      await createFormFields(formId, fieldsToCreate);      setFormData({ title: '', description: '' });      setFields([]);      setSuccess('Form created successfully! Redirecting to forms...');      setTimeout(() => navigate('/forms'), 2000);    } catch (err) {      setError(err.message);      if (err.message.includes('Authentication failed')) {        setTimeout(() => navigate('/login'), 2000);      }    } finally {      setLoading(false);    }  }, [formData, fields, createForm, createFormFields, navigate]);  const isCustomSize = currentField.image_ratio === 'free';  // Helper function to get validation pattern for preview  const getInputProps = (field) => {    const validation = VALIDATION_PATTERNS[field.field_type] || VALIDATION_PATTERNS.text;    return {      type: validation.type || 'text',      pattern: validation.pattern,      title: validation.title,      inputMode: validation.inputMode,      placeholder: field.placeholder || validation.placeholder || `Enter ${field.label.toLowerCase()}`    };  };  return (    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 mt-20">      <div className="max-w-6xl mx-auto">        {/* Header */}        <div className="mb-8">          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">            <div>              <h1 className="text-3xl md:text-4xl font-bold text-gray-800">Form Builder</h1>              <p className="text-gray-600 mt-2">Create beautiful forms with custom fields</p>            </div>            <div className="flex items-center space-x-3">              <button                onClick={() => navigate('/forms')}                className="px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 flex items-center gap-2 text-gray-700 font-medium shadow-sm"              >                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">                  <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />                </svg>                View Forms              </button>              <div className="px-4 py-2 bg-blue-50 rounded-lg border border-blue-100">                <span className="text-sm font-medium text-blue-700">                  {fields.length} field{fields.length !== 1 ? 's' : ''} added                </span>              </div>            </div>          </div>          {/* Progress Steps */}          <div className="mt-8 flex items-center justify-center">            <div className="flex items-center space-x-4">              {['details', 'fields', 'preview'].map((step, index) => (                <div key={step} className="flex items-center">                  <button                    onClick={() => setActiveSection(step)}                    className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold transition-all duration-300 ${                      activeSection === step                         ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'                         : step === 'preview' && fields.length === 0                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'                        : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'                    }`}                    disabled={step === 'preview' && fields.length === 0}                  >                    {index + 1}                  </button>                  {index < 2 && (                    <div className={`w-16 h-1 ${                      activeSection === step || (index === 0 && activeSection === 'fields')                        ? 'bg-blue-500' : 'bg-gray-300'                    }`} />                  )}                </div>              ))}              <div className="ml-6 hidden md:block">                <span className="text-sm font-medium text-gray-600">                  {activeSection === 'details' && 'Form Details'}                  {activeSection === 'fields' && 'Add Fields'}                  {activeSection === 'preview' && 'Preview & Submit'}                </span>              </div>            </div>          </div>        </div>        {/* Alert Messages */}        <div className="mb-6 space-y-3">          {error && (            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm animate-fadeIn">              <div className="flex items-start">                <div className="flex-shrink-0">                  <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />                  </svg>                </div>                <div className="ml-3">                  <p className="text-sm font-medium text-red-800">{error}</p>                </div>                <button                  onClick={() => setError(null)}                  className="ml-auto -mx-1.5 -my-1.5 text-red-500 hover:text-red-700"                >                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" />                  </svg>                </button>              </div>            </div>          )}          {success && (            <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg shadow-sm animate-fadeIn">              <div className="flex items-start">                <div className="flex-shrink-0">                  <svg className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />                  </svg>                </div>                <div className="ml-3">                  <p className="text-sm font-medium text-green-800">{success}</p>                </div>              </div>            </div>          )}        </div>        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">          {/* Left Column - Form Details & Field Builder */}          <div className="lg:col-span-2 space-y-6">            {/* Form Details Card */}            <div className={`bg-white rounded-xl shadow-lg border border-gray-200 transition-all duration-300 ${activeSection !== 'details' ? 'opacity-60' : ''}`}>              <div                 className="p-6 cursor-pointer"                onClick={() => setActiveSection('details')}              >                <div className="flex items-center justify-between mb-4">                  <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">                    <span className="p-2 bg-blue-100 rounded-lg">                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />                      </svg>                    </span>                    Form Details                  </h3>                  <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">                    Required                  </span>                </div>                <div className="space-y-5">                  <div>                    <label className="block text-sm font-semibold text-gray-700 mb-2">                      Form Title <span className="text-red-500">*</span>                    </label>                    <input                      type="text"                      value={formData.title}                      onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"                      placeholder="Enter a descriptive title for your form"                    />                  </div>                  <div>                    <label className="block text-sm font-semibold text-gray-700 mb-2">                      Description                    </label>                    <textarea                      value={formData.description}                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"                      rows={3}                      placeholder="Describe what this form is for (optional)"                    />                  </div>                </div>              </div>            </div>            {/* Field Builder Card */}            <div className={`bg-white rounded-xl shadow-lg border border-gray-200 transition-all duration-300 ${activeSection !== 'fields' ? 'opacity-60' : ''}`}>              <div                 className="p-6 cursor-pointer"                onClick={() => setActiveSection('fields')}              >                <div className="flex items-center justify-between mb-6">                  <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">                    <span className="p-2 bg-purple-100 rounded-lg">                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-purple-600" viewBox="0 0 20 20" fill="currentColor">                        <path fillRule="evenodd" d="M10 3a1 1 0 00-1 1v5H4a1 1 0 100 2h5v5a1 1 0 102 0v-5h5a1 1 0 100-2h-5V4a1 1 0 00-1-1z" clipRule="evenodd" />                      </svg>                    </span>                    Add New Field                  </h3>                  <span className="text-sm font-medium text-gray-500">                    Step 2 of 3                  </span>                </div>                <div className="space-y-5">                  {/* Field Label */}                  <div>                    <label className="block text-sm font-semibold text-gray-700 mb-2">                      Field Label <span className="text-red-500">*</span>                    </label>                    <input                      type="text"                      value={currentField.label}                      onChange={(e) => setCurrentField(prev => ({ ...prev, label: e.target.value }))}                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"                      placeholder="What should this field be called?"                    />                  </div>                  {/* Field Type Selection */}                  <div>                    <label className="block text-sm font-semibold text-gray-700 mb-3">                      Field Type                    </label>                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">                      {FIELD_TYPES.map(type => (                        <button                          key={type.value}                          type="button"                          onClick={() => setCurrentField(prev => ({ ...prev, field_type: type.value }))}                          className={`p-4 rounded-lg border transition-all duration-200 flex flex-col items-center gap-2 ${                            currentField.field_type === type.value                              ? 'border-blue-500 bg-blue-50 shadow-sm ring-2 ring-blue-200'                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'                          }`}                        >                          <span className="text-2xl">{type.icon}</span>                          <span className="text-sm font-medium text-gray-700">{type.label}</span>                          {currentField.field_type === type.value && (                            <span className="text-xs text-blue-600 font-semibold">Selected</span>                          )}                        </button>                      ))}                    </div>                  </div>                  {/* Validation Info */}                  {currentField.field_type && currentField.field_type !== 'dropdown' &&                    currentField.field_type !== 'checkbox' &&                    currentField.field_type !== 'image' && (                    <div className="bg-blue-50 p-3 rounded-lg">                      <p className="text-xs text-blue-700">                        <span className="font-semibold">Validation: </span>                        {VALIDATION_PATTERNS[currentField.field_type]?.title}                      </p>                    </div>                  )}                  {/* Conditional Fields */}                  <div className="space-y-4">                    {currentField.field_type === 'dropdown' && (                      <div>                        <label className="block text-sm font-semibold text-gray-700 mb-2">                          Dropdown Options                        </label>                        <input                          type="text"                          value={currentField.options}                          onChange={(e) => setCurrentField(prev => ({ ...prev, options: e.target.value }))}                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"                          placeholder="Option 1, Option 2, Option 3"                        />                        <p className="text-xs text-gray-500 mt-2">Separate options with commas</p>                      </div>                    )}                    {currentField.field_type === 'image' && (                      <div className="space-y-4">                        <div>                          <label className="block text-sm font-semibold text-gray-700 mb-2">                            Image Specifications                          </label>                          <select                            value={currentField.image_ratio}                            onChange={handleRatioChange}                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"                          >                            {ASPECT_RATIOS.map(ratio => (                              <option key={ratio.value} value={ratio.value}>                                {ratio.label}                              </option>                            ))}                          </select>                        </div>                        {isCustomSize && (                          <div className="grid grid-cols-2 gap-4">                            <div>                              <label className="block text-sm font-semibold text-gray-700 mb-2">                                Width (px)                              </label>                              <input  type="number"  value={currentField.image_width}  onChange={(e) => {    // Allow empty input while typing    const value = e.target.value;    if (value === '') {      handleDimensionChange('width', '');    } else {      handleDimensionChange('width', Number(value));    }  }}  onBlur={(e) => {    // Validate on blur to ensure minimum value    if (e.target.value === '' || Number(e.target.value) < 100) {      handleDimensionChange('width', 100);    }  }}  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"  min="100"  max="4000"  step="1"/>                            </div>                            <div>                              <label className="block text-sm font-semibold text-gray-700 mb-2">                                Height (px)                              </label>                              <input                                type="number"                                value={currentField.image_height}                                onChange={(e) => handleDimensionChange('height', e.target.value)}                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"                                min="100"                                max="4000"                              />                            </div>                          </div>                        )}                        {/* Size Preview */}                        <div className="bg-gray-50 p-4 rounded-lg">                          <div className="flex items-center justify-between mb-3">                            <span className="text-sm font-medium text-gray-700">Preview</span>                            <span className="text-sm text-gray-500">                              {currentField.image_width} × {currentField.image_height}px                            </span>                          </div>                          <div className="flex justify-center">                            <div                               className="bg-gradient-to-br from-blue-100 to-blue-200 border-2 border-dashed border-blue-300 flex items-center justify-center rounded-lg"                              style={{                                 width: '120px',                                height: `${120 * (currentField.image_height / currentField.image_width)}px`,                                maxHeight: '120px'                              }}                            >                              <div className="text-center">                                <div className="text-xs font-medium text-blue-700">                                  {Math.round(currentField.image_width)}×{Math.round(currentField.image_height)}                                </div>                                <div className="text-xs text-blue-600">                                  {currentField.image_ratio}                                </div>                              </div>                            </div>                          </div>                        </div>                      </div>                    )}                    {/* Placeholder - Show for all except checkbox, dropdown, image */}                    {currentField.field_type !== 'checkbox' &&                      currentField.field_type !== 'dropdown' &&                      currentField.field_type !== 'image' && (                      <div>                        <label className="block text-sm font-semibold text-gray-700 mb-2">                          Placeholder Text                        </label>                        <input                          type="text"                          value={currentField.placeholder}                          onChange={(e) => setCurrentField(prev => ({ ...prev, placeholder: e.target.value }))}                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-sm"                          placeholder={VALIDATION_PATTERNS[currentField.field_type]?.placeholder || "Enter placeholder text"}                        />                      </div>                    )}                    {/* Field Options */}                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">                      <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">                        <div className="relative">                          <input                            type="checkbox"                            checked={currentField.is_required}                            onChange={(e) => setCurrentField(prev => ({ ...prev, is_required: e.target.checked }))}                            className="sr-only"                          />                          <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${                            currentField.is_required                               ? 'bg-blue-500 border-blue-500'                               : 'border-gray-300'                          }`}>                            {currentField.is_required && (                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />                              </svg>                            )}                          </div>                        </div>                        <div>                          <span className="font-medium text-gray-700">Required Field</span>                          <p className="text-xs text-gray-500">User must fill this field</p>                        </div>                      </label>                      <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">                        <div className="relative">                          <input                            type="checkbox"                            checked={currentField.is_unique}                            onChange={(e) => setCurrentField(prev => ({ ...prev, is_unique: e.target.checked }))}                            className="sr-only"                          />                          <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${                            currentField.is_unique                               ? 'bg-green-500 border-green-500'                               : 'border-gray-300'                          }`}>                            {currentField.is_unique && (                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />                              </svg>                            )}                          </div>                        </div>                        <div>                          <span className="font-medium text-gray-700">Unique Value</span>                          <p className="text-xs text-gray-500">No duplicate values allowed</p>                        </div>                      </label>                    </div>                  </div>                  {/* Add Field Button */}                  <button                    onClick={addField}                    disabled={!currentField.label.trim()}                    className="w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-purple-100"                  >                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">                      <path fillRule="evenodd" d="M10 3a1 1 0 00-1 1v5H4a1 1 0 100 2h5v5a1 1 0 102 0v-5h5a1 1 0 100-2h-5V4a1 1 0 00-1-1z" clipRule="evenodd" />                    </svg>                    Add Field to Form                  </button>                </div>              </div>            </div>          </div>          {/* Right Column - Preview & Submit */}          <div className="space-y-6">            {/* Preview Card */}            <div className={`bg-white rounded-xl shadow-lg border border-gray-200 transition-all duration-300 ${activeSection !== 'preview' ? 'opacity-60' : ''}`}>              <div                 className="p-6 cursor-pointer"                onClick={() => fields.length > 0 && setActiveSection('preview')}              >                <div className="flex items-center justify-between mb-6">                  <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">                    <span className="p-2 bg-green-100 rounded-lg">                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600" viewBox="0 0 20 20" fill="currentColor">                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />                        <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />                      </svg>                    </span>                    Form Preview                  </h3>                  <span className="text-sm font-medium text-green-600 bg-green-50 px-3 py-1 rounded-full">                    {fields.length} Fields                  </span>                </div>                {fields.length === 0 ? (                  <div className="text-center py-8">                    <div className="text-gray-400 mb-3">                      <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />                      </svg>                    </div>                    <p className="text-gray-500 font-medium">No fields added yet</p>                    <p className="text-sm text-gray-400 mt-1">Add fields from the left panel</p>                  </div>                ) : (                  <div className="space-y-3">                    {/* Form Preview Header */}                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg mb-4">                      <h4 className="font-bold text-gray-800 text-lg">{formData.title || 'Untitled Form'}</h4>                      {formData.description && (                        <p className="text-sm text-gray-600 mt-1">{formData.description}</p>                      )}                    </div>                    {/* Fields Preview */}                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">                      {fields.map((field, index) => {                        const inputProps = getInputProps(field);                        return (                          <div key={field.id} className="group border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-all duration-200 bg-white">                            <div className="flex items-start justify-between">                              <div className="flex-1 min-w-0">                                <div className="flex items-center gap-2 mb-2">                                  <span className="text-lg">{FIELD_TYPES.find(t => t.value === field.field_type)?.icon}</span>                                  <span className="font-semibold text-gray-800">{field.label}</span>                                  <div className="flex items-center gap-1 flex-wrap">                                    {field.is_required && (                                      <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Required</span>                                    )}                                    {field.is_unique && (                                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Unique</span>                                    )}                                  </div>                                </div>                                {/* Field Preview */}                                <div className="ml-7 space-y-2">                                  {/* Text Field */}                                  {field.field_type === 'text' && (                                    <input                                      type="text"                                      placeholder={inputProps.placeholder}                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"                                      disabled                                    />                                  )}                                  {/* Number Field */}                                  {field.field_type === 'number' && (                                    <input                                      type="number"                                      placeholder={inputProps.placeholder}                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"                                      disabled                                    />                                  )}                                  {/* Date Field */}                                  {field.field_type === 'date' && (                                    <input                                      type="date"                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"                                      disabled                                    />                                  )}                                  {/* Dropdown Field */}                                  {field.field_type === 'dropdown' && (                                    <select className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500" disabled>                                      <option>{field.placeholder || `Select ${field.label.toLowerCase()}`}</option>                                      {field.options?.choices?.map((choice, i) => (                                        <option key={i}>{choice}</option>                                      ))}                                    </select>                                  )}                                  {/* Checkbox Field */}                                  {field.field_type === 'checkbox' && (                                    <label className="flex items-center gap-2">                                      <input type="checkbox" className="rounded border-gray-300" disabled />                                      <span className="text-sm text-gray-600">{field.placeholder || `Check ${field.label.toLowerCase()}`}</span>                                    </label>                                  )}                                  {/* Image Upload Field */}                                  {field.field_type === 'image' && (                                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center">                                      <div className="text-gray-400 mb-1">                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />                                        </svg>                                      </div>                                      <p className="text-xs text-gray-500">Upload image ({field.options?.width || 800}×{field.options?.height || 600}px)</p>                                      <p className="text-xs text-gray-400 mt-1">JPG, PNG, GIF up to 5MB</p>                                    </div>                                  )}                                  {/* Alphanumeric Field */}                                  {field.field_type === 'alphanumeric' && (                                    <div>                                      <input                                        type="text"                                        pattern="[A-Za-z0-9]*"                                        placeholder={inputProps.placeholder}                                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"                                        title="Only letters and numbers are allowed"                                        disabled                                      />                                      <p className="text-xs text-gray-500 mt-1">Only letters and numbers allowed</p>                                    </div>                                  )}                                  {/* Email Field */}                                  {field.field_type === 'email' && (                                    <div>                                      <div className="relative">                                        <input                                          type="email"                                          placeholder={inputProps.placeholder}                                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 pl-8"                                          pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"                                          title="Please enter a valid email address"                                          disabled                                        />                                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">                                          📧                                        </span>                                      </div>                                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">                                        <span className="inline-block w-4 h-4 bg-green-100 rounded-full text-green-600 text-center leading-4 text-[10px]">✓</span>                                        Format: name@example.com                                      </p>                                      <p className="text-xs text-gray-400 mt-0.5 ml-5">Example: john.doe@company.com</p>                                    </div>                                  )}                                  {/* Phone Number Field */}                                  {(field.field_type === 'phonenumber') && (                                    <div>                                      <div className="relative">                                        <input                                          type="tel"                                          placeholder={inputProps.placeholder}                                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 pl-8"                                          pattern="[+]?[0-9]{10,15}"                                          title="Please enter a valid phone number (10-15 digits, optional + prefix)"                                          inputMode="tel"                                          disabled                                        />                                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">                                          📱                                        </span>                                      </div>                                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">                                        <span className="inline-block w-4 h-4 bg-green-100 rounded-full text-green-600 text-center leading-4 text-[10px]">✓</span>                                        Format: +1234567890 (10-15 digits)                                      </p>                                      <p className="text-xs text-gray-400 mt-0.5 ml-5">Example: +1234567890 or 1234567890</p>                                    </div>                                  )}                                </div>                              </div>                              {/* Field Actions */}                              <div className="flex items-center gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">                                <button                                  onClick={() => moveField(index, 'up')}                                  disabled={index === 0}                                  className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-30"                                  title="Move up"                                >                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">                                    <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />                                  </svg>                                </button>                                <button                                  onClick={() => moveField(index, 'down')}                                  disabled={index === fields.length - 1}                                  className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-30"                                  title="Move down"                                >                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">                                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />                                  </svg>                                </button>                                <button                                  onClick={() => removeField(index)}                                  className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"                                  title="Remove"                                >                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">                                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />                                  </svg>                                </button>                              </div>                            </div>                          </div>                        );                      })}                    </div>                  </div>                )}              </div>            </div>            {/* Submit Card */}            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl shadow-xl p-6">              <h3 className="text-xl font-bold text-white mb-2">Ready to Create</h3>              <p className="text-gray-300 text-sm mb-6">                Review your form and submit when ready. All changes are saved automatically.              </p>              <div className="space-y-4">                <div className="flex items-center justify-between text-sm">                  <span className="text-gray-300">Form Title</span>                  <span className="font-medium text-white">{formData.title || 'Not set'}</span>                </div>                <div className="flex items-center justify-between text-sm">                  <span className="text-gray-300">Fields Added</span>                  <span className="font-medium text-white">{fields.length}</span>                </div>                <div className="flex items-center justify-between text-sm">                  <span className="text-gray-300">Required Fields</span>                  <span className="font-medium text-white">{fields.filter(f => f.is_required).length}</span>                </div>                <div className="pt-4 border-t border-gray-700">                  <button                    onClick={handleSubmit}                    disabled={loading || !formData.title.trim() || fields.length === 0 || !localStorage.getItem('access')}                    className="w-full py-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-green-900/30"                  >                    {loading ? (                      <>                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>                        </svg>                        Creating Form...                      </>                    ) : (                      <>                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />                        </svg>                        Create Form                      </>                    )}                  </button>                  <p className="text-xs text-gray-400 text-center mt-3">                    {!localStorage.getItem('access')                       ? 'Please log in to create forms'                       : fields.length === 0                         ? 'Add at least one field to continue'                        : 'Click to publish your form'}                  </p>                </div>              </div>            </div>          </div>        </div>        {/* Footer Help Text */}        <div className="mt-8 text-center text-gray-500 text-sm">          <p>Need help? Fields are saved automatically. You can reorder them using the up/down arrows.</p>        </div>      </div>      {/* Add custom animations */}      <style jsx>{`        @keyframes fadeIn {          from { opacity: 0; transform: translateY(-10px); }          to { opacity: 1; transform: translateY(0); }        }        .animate-fadeIn {          animation: fadeIn 0.3s ease-out;        }      `}</style>    </div>  );};export default FormBuilder;

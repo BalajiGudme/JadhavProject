@@ -1,108 +1,1 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-
-const ArchitectureStats = () => {
-  const [selectedNode, setSelectedNode] = useState('');
-  const [stats, setStats] = useState(null);
-  const [nodes, setNodes] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    fetchNodes();
-  }, []);
-
-  const fetchNodes = async () => {
-    try {
-      const response = await axios.get('/api/architecture/');
-      setNodes(response.data);
-    } catch (err) {
-      console.error('Failed to fetch nodes');
-    }
-  };
-
-  const fetchStats = async (nodeId) => {
-    if (!nodeId) return;
-    
-    setLoading(true);
-    try {
-      const response = await axios.get(`/api/architecture/${nodeId}/statistics/`);
-      setStats(response.data);
-    } catch (err) {
-      console.error('Failed to fetch statistics');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-800">Architecture Statistics</h2>
-      
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Select Node to View Statistics
-          </label>
-          <select
-            value={selectedNode}
-            onChange={(e) => {
-              setSelectedNode(e.target.value);
-              fetchStats(e.target.value);
-            }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Select a node...</option>
-            {nodes.map(node => (
-              <option key={node.id} value={node.id}>
-                {node.name} {node.institution_type && `(${node.institution_type})`}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {loading && (
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          </div>
-        )}
-
-        {stats && !loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-blue-50 p-4 rounded-lg text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.student_count}</div>
-              <div className="text-sm text-blue-800">Current Students</div>
-            </div>
-            
-            <div className="bg-green-50 p-4 rounded-lg text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.total_students}</div>
-              <div className="text-sm text-green-800">Total Students</div>
-            </div>
-            
-            <div className="bg-purple-50 p-4 rounded-lg text-center">
-              <div className="text-2xl font-bold text-purple-600">{stats.staff_count}</div>
-              <div className="text-sm text-purple-800">Current Staff</div>
-            </div>
-            
-            <div className="bg-orange-50 p-4 rounded-lg text-center">
-              <div className="text-2xl font-bold text-orange-600">{stats.total_staff}</div>
-              <div className="text-sm text-orange-800">Total Staff</div>
-            </div>
-            
-            <div className="bg-gray-50 p-4 rounded-lg text-center col-span-full">
-              <div className="text-lg font-bold text-gray-700">{stats.children_count}</div>
-              <div className="text-sm text-gray-600">Child Nodes</div>
-            </div>
-          </div>
-        )}
-
-        {!stats && !loading && selectedNode && (
-          <div className="text-center text-gray-500 py-8">
-            Select a node to view statistics
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default ArchitectureStats;
+import React, { useState, useEffect } from 'react';import axios from 'axios';const ArchitectureStats = () => {  const [selectedNode, setSelectedNode] = useState('');  const [stats, setStats] = useState(null);  const [nodes, setNodes] = useState([]);  const [loading, setLoading] = useState(false);  useEffect(() => {    fetchNodes();  }, []);  const fetchNodes = async () => {    try {      const response = await axios.get('/api/architecture/');      setNodes(response.data);    } catch (err) {    }  };  const fetchStats = async (nodeId) => {    if (!nodeId) return;    setLoading(true);    try {      const response = await axios.get(`/api/architecture/${nodeId}/statistics/`);      setStats(response.data);    } catch (err) {    } finally {      setLoading(false);    }  };  return (    <div className="space-y-6">      <h2 className="text-2xl font-bold text-gray-800">Architecture Statistics</h2>      <div className="bg-white rounded-lg shadow-sm p-6">        <div className="mb-4">          <label className="block text-sm font-medium text-gray-700 mb-2">            Select Node to View Statistics          </label>          <select            value={selectedNode}            onChange={(e) => {              setSelectedNode(e.target.value);              fetchStats(e.target.value);            }}            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"          >            <option value="">Select a node...</option>            {nodes.map(node => (              <option key={node.id} value={node.id}>                {node.name} {node.institution_type && `(${node.institution_type})`}              </option>            ))}          </select>        </div>        {loading && (          <div className="flex items-center justify-center py-8">            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>          </div>        )}        {stats && !loading && (          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">            <div className="bg-blue-50 p-4 rounded-lg text-center">              <div className="text-2xl font-bold text-blue-600">{stats.student_count}</div>              <div className="text-sm text-blue-800">Current Students</div>            </div>            <div className="bg-green-50 p-4 rounded-lg text-center">              <div className="text-2xl font-bold text-green-600">{stats.total_students}</div>              <div className="text-sm text-green-800">Total Students</div>            </div>            <div className="bg-purple-50 p-4 rounded-lg text-center">              <div className="text-2xl font-bold text-purple-600">{stats.staff_count}</div>              <div className="text-sm text-purple-800">Current Staff</div>            </div>            <div className="bg-orange-50 p-4 rounded-lg text-center">              <div className="text-2xl font-bold text-orange-600">{stats.total_staff}</div>              <div className="text-sm text-orange-800">Total Staff</div>            </div>            <div className="bg-gray-50 p-4 rounded-lg text-center col-span-full">              <div className="text-lg font-bold text-gray-700">{stats.children_count}</div>              <div className="text-sm text-gray-600">Child Nodes</div>            </div>          </div>        )}        {!stats && !loading && selectedNode && (          <div className="text-center text-gray-500 py-8">            Select a node to view statistics          </div>        )}      </div>    </div>  );};export default ArchitectureStats;

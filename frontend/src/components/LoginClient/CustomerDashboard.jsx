@@ -1,371 +1,1 @@
-// components/CustomerDashboard.jsx
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { getCurrentUser } from "../utils/auth";
-
-const CustomerDashboard = () => {
-  const [user, setUser] = useState(null);
-  const [stats, setStats] = useState({
-    totalForms: 0,
-    pendingForms: 0,
-    approvedForms: 0,
-    rejectedForms: 0
-  });
-  const [recentForms, setRecentForms] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const userData = getCurrentUser();
-    setUser(userData);
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
-    // Simulate API call to fetch dashboard data
-    try {
-      setLoading(true);
-      
-      // Mock data - replace with actual API calls
-      const mockStats = {
-        totalForms: 12,
-        pendingForms: 3,
-        approvedForms: 8,
-        rejectedForms: 1
-      };
-
-      const mockRecentForms = [
-        {
-          id: 1,
-          title: "Student ID Application",
-          status: "approved",
-          date: "2024-01-15",
-          type: "Student ID"
-        },
-        {
-          id: 2,
-          title: "Staff ID Renewal",
-          status: "pending",
-          date: "2024-01-14",
-          type: "Staff ID"
-        },
-        {
-          id: 3,
-          title: "Visitor Pass",
-          status: "rejected",
-          date: "2024-01-13",
-          type: "Visitor Pass"
-        },
-        {
-          id: 4,
-          title: "Library Card Application",
-          status: "approved",
-          date: "2024-01-12",
-          type: "Library Card"
-        }
-      ];
-
-      setStats(mockStats);
-      setRecentForms(mockRecentForms);
-    } catch (error) {
-      console.error("Error loading dashboard data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      approved: { color: "bg-green-100 text-green-800", label: "Approved" },
-      pending: { color: "bg-yellow-100 text-yellow-800", label: "Pending" },
-      rejected: { color: "bg-red-100 text-red-800", label: "Rejected" }
-    };
-    
-    const config = statusConfig[status] || statusConfig.pending;
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
-        {config.label}
-      </span>
-    );
-  };
-
-  const getFormTypeColor = (type) => {
-    const colors = {
-      "Student ID": "bg-blue-500",
-      "Staff ID": "bg-purple-500",
-      "Visitor Pass": "bg-orange-500",
-      "Library Card": "bg-green-500"
-    };
-    return colors[type] || "bg-gray-500";
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Welcome back, {user?.name || "Customer"}! 👋
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Here's your ID management dashboard overview
-          </p>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-blue-100">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Forms</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalForms}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-yellow-100">
-                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Pending</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.pendingForms}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-green-100">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Approved</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.approvedForms}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-red-100">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Rejected</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.rejectedForms}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          {/* Recent Forms */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900">Recent Forms</h2>
-                  <Link 
-                    to="/arch" 
-                    className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                  >
-                    View All
-                  </Link>
-                </div>
-              </div>
-              <div className="p-6">
-                {recentForms.length > 0 ? (
-                  <div className="space-y-4">
-                    {recentForms.map((form) => (
-                      <div key={form.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                        <div className="flex items-center space-x-4">
-                          <div className={`w-3 h-3 rounded-full ${getFormTypeColor(form.type)}`}></div>
-                          <div>
-                            <h3 className="font-medium text-gray-900">{form.title}</h3>
-                            <p className="text-sm text-gray-500">{form.type} • {new Date(form.date).toLocaleDateString()}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          {getStatusBadge(form.status)}
-                          <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                            View
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <p className="text-gray-500">No forms submitted yet</p>
-                    <Link 
-                      to="/student" 
-                      className="text-blue-600 hover:text-blue-700 font-medium mt-2 inline-block"
-                    >
-                      Submit your first form
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Actions Sidebar */}
-          <div className="space-y-6">
-            {/* Create New Form */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-              <div className="space-y-3">
-                <Link
-                  to="/student"
-                  className="w-full flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition-colors group"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
-                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                    </div>
-                    <span className="font-medium text-gray-900">New ID Form</span>
-                  </div>
-                  <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
-
-                <Link
-                  to="/arch"
-                  className="w-full flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-green-50 hover:border-green-200 transition-colors group"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
-                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                    <span className="font-medium text-gray-900">My Forms</span>
-                  </div>
-                  <svg className="w-4 h-4 text-gray-400 group-hover:text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
-              </div>
-            </div>
-
-            {/* Status Overview */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Status Overview</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Approval Rate</span>
-                  <span className="text-sm font-semibold text-gray-900">
-                    {stats.totalForms > 0 ? Math.round((stats.approvedForms / stats.totalForms) * 100) : 0}%
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-green-600 h-2 rounded-full transition-all duration-500" 
-                    style={{ width: `${stats.totalForms > 0 ? (stats.approvedForms / stats.totalForms) * 100 : 0}%` }}
-                  ></div>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-200">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-yellow-600">{stats.pendingForms}</div>
-                    <div className="text-xs text-gray-500">Pending</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{stats.approvedForms}</div>
-                    <div className="text-xs text-gray-500">Approved</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-red-600">{stats.rejectedForms}</div>
-                    <div className="text-xs text-gray-500">Rejected</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Support Card */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl shadow-sm p-6 text-white">
-              <h3 className="text-lg font-semibold mb-2">Need Help?</h3>
-              <p className="text-blue-100 text-sm mb-4">
-                Having issues with your ID forms? Our support team is here to help.
-              </p>
-              <button className="w-full bg-white text-blue-600 py-2 px-4 rounded-lg font-semibold hover:bg-blue-50 transition-colors">
-                Contact Support
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
-          </div>
-          <div className="p-6">
-            <div className="space-y-4">
-              {[
-                { action: "Form Submitted", description: "Student ID Application", time: "2 hours ago", type: "submit" },
-                { action: "Status Updated", description: "Staff ID Renewal - Approved", time: "1 day ago", type: "approve" },
-                { action: "Form Submitted", description: "Visitor Pass Request", time: "2 days ago", type: "submit" },
-                { action: "Status Updated", description: "Library Card - Rejected", time: "3 days ago", type: "reject" }
-              ].map((activity, index) => (
-                <div key={index} className="flex items-center space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    activity.type === 'submit' ? 'bg-blue-100' : 
-                    activity.type === 'approve' ? 'bg-green-100' : 'bg-red-100'
-                  }`}>
-                    <svg className={`w-4 h-4 ${
-                      activity.type === 'submit' ? 'text-blue-600' : 
-                      activity.type === 'approve' ? 'text-green-600' : 'text-red-600'
-                    }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      {activity.type === 'submit' ? (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      ) : activity.type === 'approve' ? (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      ) : (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      )}
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">{activity.action}</p>
-                    <p className="text-sm text-gray-500">{activity.description}</p>
-                  </div>
-                  <div className="text-sm text-gray-400">{activity.time}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default CustomerDashboard;
+// components/CustomerDashboard.jsximport { useState, useEffect } from "react";import { Link } from "react-router-dom";import { getCurrentUser } from "../utils/auth";const CustomerDashboard = () => {  const [user, setUser] = useState(null);  const [stats, setStats] = useState({    totalForms: 0,    pendingForms: 0,    approvedForms: 0,    rejectedForms: 0  });  const [recentForms, setRecentForms] = useState([]);  const [loading, setLoading] = useState(true);  useEffect(() => {    const userData = getCurrentUser();    setUser(userData);    loadDashboardData();  }, []);  const loadDashboardData = async () => {    // Simulate API call to fetch dashboard data    try {      setLoading(true);      // Mock data - replace with actual API calls      const mockStats = {        totalForms: 12,        pendingForms: 3,        approvedForms: 8,        rejectedForms: 1      };      const mockRecentForms = [        {          id: 1,          title: "Student ID Application",          status: "approved",          date: "2024-01-15",          type: "Student ID"        },        {          id: 2,          title: "Staff ID Renewal",          status: "pending",          date: "2024-01-14",          type: "Staff ID"        },        {          id: 3,          title: "Visitor Pass",          status: "rejected",          date: "2024-01-13",          type: "Visitor Pass"        },        {          id: 4,          title: "Library Card Application",          status: "approved",          date: "2024-01-12",          type: "Library Card"        }      ];      setStats(mockStats);      setRecentForms(mockRecentForms);    } catch (error) {    } finally {      setLoading(false);    }  };  const getStatusBadge = (status) => {    const statusConfig = {      approved: { color: "bg-green-100 text-green-800", label: "Approved" },      pending: { color: "bg-yellow-100 text-yellow-800", label: "Pending" },      rejected: { color: "bg-red-100 text-red-800", label: "Rejected" }    };    const config = statusConfig[status] || statusConfig.pending;    return (      <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>        {config.label}      </span>    );  };  const getFormTypeColor = (type) => {    const colors = {      "Student ID": "bg-blue-500",      "Staff ID": "bg-purple-500",      "Visitor Pass": "bg-orange-500",      "Library Card": "bg-green-500"    };    return colors[type] || "bg-gray-500";  };  if (loading) {    return (      <div className="min-h-screen bg-gray-50 flex items-center justify-center">        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>      </div>    );  }  return (    <div className="min-h-screen bg-gray-50 py-8">      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">        {/* Welcome Section */}        <div className="mb-8">          <h1 className="text-3xl font-bold text-gray-900">            Welcome back, {user?.name || "Customer"}! 👋          </h1>          <p className="text-gray-600 mt-2">            Here's your ID management dashboard overview          </p>        </div>        {/* Quick Stats */}        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">            <div className="flex items-center">              <div className="p-3 rounded-lg bg-blue-100">                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />                </svg>              </div>              <div className="ml-4">                <p className="text-sm font-medium text-gray-600">Total Forms</p>                <p className="text-2xl font-bold text-gray-900">{stats.totalForms}</p>              </div>            </div>          </div>          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">            <div className="flex items-center">              <div className="p-3 rounded-lg bg-yellow-100">                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />                </svg>              </div>              <div className="ml-4">                <p className="text-sm font-medium text-gray-600">Pending</p>                <p className="text-2xl font-bold text-gray-900">{stats.pendingForms}</p>              </div>            </div>          </div>          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">            <div className="flex items-center">              <div className="p-3 rounded-lg bg-green-100">                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />                </svg>              </div>              <div className="ml-4">                <p className="text-sm font-medium text-gray-600">Approved</p>                <p className="text-2xl font-bold text-gray-900">{stats.approvedForms}</p>              </div>            </div>          </div>          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">            <div className="flex items-center">              <div className="p-3 rounded-lg bg-red-100">                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />                </svg>              </div>              <div className="ml-4">                <p className="text-sm font-medium text-gray-600">Rejected</p>                <p className="text-2xl font-bold text-gray-900">{stats.rejectedForms}</p>              </div>            </div>          </div>        </div>        {/* Quick Actions */}        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">          {/* Recent Forms */}          <div className="lg:col-span-2">            <div className="bg-white rounded-xl shadow-sm border border-gray-200">              <div className="px-6 py-4 border-b border-gray-200">                <div className="flex items-center justify-between">                  <h2 className="text-lg font-semibold text-gray-900">Recent Forms</h2>                  <Link                     to="/arch"                     className="text-blue-600 hover:text-blue-700 text-sm font-medium"                  >                    View All                  </Link>                </div>              </div>              <div className="p-6">                {recentForms.length > 0 ? (                  <div className="space-y-4">                    {recentForms.map((form) => (                      <div key={form.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">                        <div className="flex items-center space-x-4">                          <div className={`w-3 h-3 rounded-full ${getFormTypeColor(form.type)}`}></div>                          <div>                            <h3 className="font-medium text-gray-900">{form.title}</h3>                            <p className="text-sm text-gray-500">{form.type} • {new Date(form.date).toLocaleDateString()}</p>                          </div>                        </div>                        <div className="flex items-center space-x-4">                          {getStatusBadge(form.status)}                          <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">                            View                          </button>                        </div>                      </div>                    ))}                  </div>                ) : (                  <div className="text-center py-8">                    <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />                    </svg>                    <p className="text-gray-500">No forms submitted yet</p>                    <Link                       to="/student"                       className="text-blue-600 hover:text-blue-700 font-medium mt-2 inline-block"                    >                      Submit your first form                    </Link>                  </div>                )}              </div>            </div>          </div>          {/* Quick Actions Sidebar */}          <div className="space-y-6">            {/* Create New Form */}            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">              <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>              <div className="space-y-3">                <Link                  to="/student"                  className="w-full flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition-colors group"                >                  <div className="flex items-center space-x-3">                    <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />                      </svg>                    </div>                    <span className="font-medium text-gray-900">New ID Form</span>                  </div>                  <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />                  </svg>                </Link>                <Link                  to="/arch"                  className="w-full flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-green-50 hover:border-green-200 transition-colors group"                >                  <div className="flex items-center space-x-3">                    <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />                      </svg>                    </div>                    <span className="font-medium text-gray-900">My Forms</span>                  </div>                  <svg className="w-4 h-4 text-gray-400 group-hover:text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />                  </svg>                </Link>              </div>            </div>            {/* Status Overview */}            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">              <h3 className="text-lg font-semibold text-gray-900 mb-4">Status Overview</h3>              <div className="space-y-4">                <div className="flex justify-between items-center">                  <span className="text-sm text-gray-600">Approval Rate</span>                  <span className="text-sm font-semibold text-gray-900">                    {stats.totalForms > 0 ? Math.round((stats.approvedForms / stats.totalForms) * 100) : 0}%                  </span>                </div>                <div className="w-full bg-gray-200 rounded-full h-2">                  <div                     className="bg-green-600 h-2 rounded-full transition-all duration-500"                     style={{ width: `${stats.totalForms > 0 ? (stats.approvedForms / stats.totalForms) * 100 : 0}%` }}                  ></div>                </div>                <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-200">                  <div className="text-center">                    <div className="text-2xl font-bold text-yellow-600">{stats.pendingForms}</div>                    <div className="text-xs text-gray-500">Pending</div>                  </div>                  <div className="text-center">                    <div className="text-2xl font-bold text-green-600">{stats.approvedForms}</div>                    <div className="text-xs text-gray-500">Approved</div>                  </div>                  <div className="text-center">                    <div className="text-2xl font-bold text-red-600">{stats.rejectedForms}</div>                    <div className="text-xs text-gray-500">Rejected</div>                  </div>                </div>              </div>            </div>            {/* Support Card */}            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl shadow-sm p-6 text-white">              <h3 className="text-lg font-semibold mb-2">Need Help?</h3>              <p className="text-blue-100 text-sm mb-4">                Having issues with your ID forms? Our support team is here to help.              </p>              <button className="w-full bg-white text-blue-600 py-2 px-4 rounded-lg font-semibold hover:bg-blue-50 transition-colors">                Contact Support              </button>            </div>          </div>        </div>        {/* Recent Activity */}        <div className="bg-white rounded-xl shadow-sm border border-gray-200">          <div className="px-6 py-4 border-b border-gray-200">            <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>          </div>          <div className="p-6">            <div className="space-y-4">              {[                { action: "Form Submitted", description: "Student ID Application", time: "2 hours ago", type: "submit" },                { action: "Status Updated", description: "Staff ID Renewal - Approved", time: "1 day ago", type: "approve" },                { action: "Form Submitted", description: "Visitor Pass Request", time: "2 days ago", type: "submit" },                { action: "Status Updated", description: "Library Card - Rejected", time: "3 days ago", type: "reject" }              ].map((activity, index) => (                <div key={index} className="flex items-center space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${                    activity.type === 'submit' ? 'bg-blue-100' :                     activity.type === 'approve' ? 'bg-green-100' : 'bg-red-100'                  }`}>                    <svg className={`w-4 h-4 ${                      activity.type === 'submit' ? 'text-blue-600' :                       activity.type === 'approve' ? 'text-green-600' : 'text-red-600'                    }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">                      {activity.type === 'submit' ? (                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />                      ) : activity.type === 'approve' ? (                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />                      ) : (                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />                      )}                    </svg>                  </div>                  <div className="flex-1">                    <p className="font-medium text-gray-900">{activity.action}</p>                    <p className="text-sm text-gray-500">{activity.description}</p>                  </div>                  <div className="text-sm text-gray-400">{activity.time}</div>                </div>              ))}            </div>          </div>        </div>      </div>    </div>  );};export default CustomerDashboard;

@@ -1,420 +1,1 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
-
-function AdminLogin({ onClose }) {
-  const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  // Forgot Password States
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
-  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
-  const [forgotPasswordMessage, setForgotPasswordMessage] = useState("");
-
-  // OTP Verification States
-  const [otp, setOtp] = useState("");
-  const [showOtpInput, setShowOtpInput] = useState(false);
-
-  // New Password States
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showNewPasswordInput, setShowNewPasswordInput] = useState(false);
-  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    try {
-      const response = await axios.post(
-        "http://127.0.0.1:8000/api/auth/admin-login/",
-        {
-          email,
-          password,
-        },
-        {
-          headers: { "Content-Type": "application/json" },
-          timeout: 10000,
-        }
-      );
-
-      console.log("Admin login response:", response.data);
-
-      localStorage.setItem("access", response.data.access);
-      localStorage.setItem("refresh", response.data.refresh);
-      localStorage.setItem("user", JSON.stringify(response.data.user));
-
-      // ✅ Redirect admin to dashboard
-      navigate("/admin/");
-
-      if (onClose) onClose();
-    } catch (err) {
-      console.log("Admin login error:", err);
-      if (err.response) {
-        if (err.response.status === 401) {
-          setError("Invalid email or password.");
-        } else if (err.response.status === 403) {
-          setError("Admin access denied.");
-        } else if (err.response.status >= 500) {
-          setError("Server error. Please try again later.");
-        } else {
-          setError(err.response.data.detail || "Login failed. Try again.");
-        }
-      } else {
-        setError("No response from server. Please check your connection.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleForgotPassword = async (e) => {
-    e.preventDefault();
-    setForgotPasswordMessage("");
-    setForgotPasswordLoading(true);
-
-    try {
-      const response = await axios.post(
-        "http://127.0.0.1:8000/api/auth/password-reset/request/",
-        { email: forgotPasswordEmail },
-        { headers: { "Content-Type": "application/json" }, timeout: 10000 }
-      );
-
-      setForgotPasswordMessage(
-        response.data.detail || "OTP sent successfully! Check your email."
-      );
-      setShowOtpInput(true);
-    } catch (err) {
-      console.log("Forgot password error:", err.response?.data);
-      const msg =
-        err.response?.data?.detail ||
-        err.response?.data?.email?.[0] ||
-        "Failed to send OTP. Try again.";
-      setForgotPasswordMessage(msg);
-    } finally {
-      setForgotPasswordLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    setForgotPasswordMessage("");
-    setForgotPasswordLoading(true);
-
-    try {
-      const response = await axios.post(
-        "http://127.0.0.1:8000/api/auth/password-reset/verify-otp/",
-        {
-          email: forgotPasswordEmail,
-          otp: otp,
-        },
-        {
-          headers: { "Content-Type": "application/json" },
-          timeout: 10000,
-        }
-      );
-
-      if (response.status === 200) {
-        setForgotPasswordMessage("OTP verified! Set your new password.");
-        setShowOtpInput(false);
-        setShowNewPasswordInput(true);
-      }
-    } catch (err) {
-      console.log("Verify OTP error:", err.response?.data);
-      const msg =
-        err.response?.data?.detail ||
-        err.response?.data?.otp?.[0] ||
-        "Invalid OTP. Try again.";
-      setForgotPasswordMessage(msg);
-    } finally {
-      setForgotPasswordLoading(false);
-    }
-  };
-
-  const handleResetPassword = async (e) => {
-    e.preventDefault();
-    if (newPassword !== confirmPassword) {
-      setForgotPasswordMessage("Passwords do not match.");
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      setForgotPasswordMessage("Password must be at least 6 characters.");
-      return;
-    }
-
-    setResetPasswordLoading(true);
-
-    try {
-      await axios.post(
-        "http://127.0.0.1:8000/api/auth/password-reset/confirm/",
-        {
-          email: forgotPasswordEmail,
-          otp,
-          new_password: newPassword,
-          confirm_password: confirmPassword,
-        },
-        {
-          headers: { "Content-Type": "application/json" },
-          timeout: 10000,
-        }
-      );
-
-      setForgotPasswordMessage("Password reset successfully!");
-      setTimeout(() => handleBackToLogin(), 2000);
-    } catch (err) {
-      console.log("Reset password error:", err.response?.data);
-      const msg =
-        err.response?.data?.detail ||
-        err.response?.data?.non_field_errors?.[0] ||
-        "Failed to reset password.";
-      setForgotPasswordMessage(msg);
-    } finally {
-      setResetPasswordLoading(false);
-    }
-  };
-
-  const handleSwitchToForgotPassword = () => {
-    setShowForgotPassword(true);
-    setForgotPasswordEmail(email);
-    setShowOtpInput(false);
-    setShowNewPasswordInput(false);
-    setForgotPasswordMessage("");
-  };
-
-  const handleBackToLogin = () => {
-    setShowForgotPassword(false);
-    setShowOtpInput(false);
-    setShowNewPasswordInput(false);
-    setForgotPasswordMessage("");
-    setForgotPasswordEmail("");
-    setOtp("");
-    setNewPassword("");
-    setConfirmPassword("");
-  };
-
-  // ✅ Close handler for all states
-  const handleClose = () => {
-    if (onClose) {
-      onClose();
-    }
-  };
-
-  // Forgot Password - New Password Input
-  if (showForgotPassword && showNewPasswordInput) {
-    return (
-      <div className="fixed inset-0  bg-opacity-40 flex justify-center items-center z-50 p-4">
-        <div className="bg-white rounded-xl w-full max-w-md relative p-6 shadow-lg animate-fade-in">
-          <button
-            onClick={handleClose}
-            className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
-          >
-            ✖
-          </button>
-          <form onSubmit={handleResetPassword} className="space-y-4">
-            <h2 className="text-2xl font-bold text-center text-blue-700">
-              Set New Password
-            </h2>
-            <input
-              type="password"
-              placeholder="New Password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full p-3 border rounded-lg"
-              required
-            />
-            <input
-              type="password"
-              placeholder="Confirm Password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full p-3 border rounded-lg"
-              required
-            />
-            <button
-              type="submit"
-              disabled={resetPasswordLoading}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
-              {resetPasswordLoading ? "Resetting..." : "Reset Password"}
-            </button>
-            <p
-              onClick={handleBackToLogin}
-              className="text-blue-600 text-center cursor-pointer hover:underline"
-            >
-              Back to Login
-            </p>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // Forgot Password - OTP Input
-  if (showForgotPassword && showOtpInput) {
-    return (
-      <div className="fixed inset-0  bg-opacity-40 flex justify-center items-center z-50 p-4">
-        <div className="bg-white rounded-xl w-full max-w-md relative p-6 shadow-lg animate-fade-in">
-          <button
-            onClick={handleClose}
-            className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
-          >
-            ✖
-          </button>
-          <form onSubmit={handleVerifyOtp} className="space-y-4">
-            <h2 className="text-2xl font-bold text-center text-blue-700">
-              Verify OTP
-            </h2>
-            <input
-              type="text"
-              placeholder="Enter OTP"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              className="w-full p-3 border rounded-lg text-center text-lg"
-              required
-              maxLength="6"
-            />
-            <button
-              type="submit"
-              disabled={forgotPasswordLoading}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
-              {forgotPasswordLoading ? "Verifying..." : "Verify OTP"}
-            </button>
-            <p
-              onClick={handleBackToLogin}
-              className="text-blue-600 text-center cursor-pointer hover:underline"
-            >
-              Back to Login
-            </p>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // Forgot Password - Email Input
-  if (showForgotPassword) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50 p-4">
-        <div className="bg-white rounded-xl w-full max-w-md relative p-6 shadow-lg animate-fade-in">
-          <button
-            onClick={handleClose}
-            className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
-          >
-            ✖
-          </button>
-          <form onSubmit={handleForgotPassword} className="space-y-4">
-            <h2 className="text-2xl font-bold text-center text-blue-700">
-              Reset Admin Password
-            </h2>
-            <input
-              type="email"
-              placeholder="Enter admin email"
-              value={forgotPasswordEmail}
-              onChange={(e) => setForgotPasswordEmail(e.target.value)}
-              className="w-full p-3 border rounded-lg"
-              required
-            />
-            <button
-              type="submit"
-              disabled={forgotPasswordLoading}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
-              {forgotPasswordLoading ? "Sending OTP..." : "Send OTP"}
-            </button>
-            <p
-              onClick={handleBackToLogin}
-              className="text-blue-600 text-center cursor-pointer hover:underline"
-            >
-              Back to Login
-            </p>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // ✅ Main Admin Login Form
-  return (
-    <div className="fixed inset-0  bg-opacity-40 flex justify-center items-center z-50 p-4">
-      <div className="bg-white rounded-xl w-full max-w-md relative p-6 shadow-lg animate-fade-in">
-        <button
-          onClick={handleClose}
-          disabled={loading}
-          className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 disabled:opacity-50"
-        >
-          ✖
-        </button>
-
-        <form onSubmit={handleLogin} className="space-y-4">
-          <h2 className="text-2xl font-bold text-center text-blue-700">
-            Admin Login
-          </h2>
-
-          {error && (
-            <div className="bg-red-50 text-red-700 border border-red-200 p-3 rounded-lg text-center">
-              {error}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Email</label>
-            <input
-              type="email"
-              placeholder="Admin email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
-              className="w-full p-3 border rounded-lg disabled:opacity-50"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              Password
-            </label>
-            <input
-              type="password"
-              placeholder="Admin password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-              className="w-full p-3 border rounded-lg disabled:opacity-50"
-              required
-            />
-          </div>
-
-          <div className="text-right">
-            <span
-              onClick={handleSwitchToForgotPassword}
-              className="text-sm text-blue-600 cursor-pointer hover:underline"
-            >
-              Forgot Password?
-            </span>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className={`w-full py-3 rounded-lg font-semibold transition-all duration-200 ${
-              loading
-                ? "bg-gray-400 text-white cursor-not-allowed"
-                : "bg-blue-600 text-white hover:bg-blue-700 transform hover:scale-105"
-            }`}
-          >
-            {loading ? "Logging in..." : "Login"}
-          </button>
-        </form>
-      </div> 
-    </div>
-  );
-}
-
-export default AdminLogin;
+import React, { useState } from "react";import { useNavigate } from "react-router-dom";import axios from "axios";function AdminLogin({ onClose }) {  const navigate = useNavigate();  const [email, setEmail] = useState("");  const [password, setPassword] = useState("");  const [error, setError] = useState("");  const [loading, setLoading] = useState(false);  // Forgot Password States  const [showForgotPassword, setShowForgotPassword] = useState(false);  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);  const [forgotPasswordMessage, setForgotPasswordMessage] = useState("");  // OTP Verification States  const [otp, setOtp] = useState("");  const [showOtpInput, setShowOtpInput] = useState(false);  // New Password States  const [newPassword, setNewPassword] = useState("");  const [confirmPassword, setConfirmPassword] = useState("");  const [showNewPasswordInput, setShowNewPasswordInput] = useState(false);  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);  const handleLogin = async (e) => {    e.preventDefault();    setError("");    setLoading(true);    try {      const response = await axios.post(        "http://127.0.0.1:8000/api/auth/admin-login/",        {          email,          password,        },        {          headers: { "Content-Type": "application/json" },          timeout: 10000,        }      );      localStorage.setItem("access", response.data.access);      localStorage.setItem("refresh", response.data.refresh);      localStorage.setItem("user", JSON.stringify(response.data.user));      // ✅ Redirect admin to dashboard      navigate("/admin/");      if (onClose) onClose();    } catch (err) {      if (err.response) {        if (err.response.status === 401) {          setError("Invalid email or password.");        } else if (err.response.status === 403) {          setError("Admin access denied.");        } else if (err.response.status >= 500) {          setError("Server error. Please try again later.");        } else {          setError(err.response.data.detail || "Login failed. Try again.");        }      } else {        setError("No response from server. Please check your connection.");      }    } finally {      setLoading(false);    }  };  const handleForgotPassword = async (e) => {    e.preventDefault();    setForgotPasswordMessage("");    setForgotPasswordLoading(true);    try {      const response = await axios.post(        "http://127.0.0.1:8000/api/auth/password-reset/request/",        { email: forgotPasswordEmail },        { headers: { "Content-Type": "application/json" }, timeout: 10000 }      );      setForgotPasswordMessage(        response.data.detail || "OTP sent successfully! Check your email."      );      setShowOtpInput(true);    } catch (err) {      const msg =        err.response?.data?.detail ||        err.response?.data?.email?.[0] ||        "Failed to send OTP. Try again.";      setForgotPasswordMessage(msg);    } finally {      setForgotPasswordLoading(false);    }  };  const handleVerifyOtp = async (e) => {    e.preventDefault();    setForgotPasswordMessage("");    setForgotPasswordLoading(true);    try {      const response = await axios.post(        "http://127.0.0.1:8000/api/auth/password-reset/verify-otp/",        {          email: forgotPasswordEmail,          otp: otp,        },        {          headers: { "Content-Type": "application/json" },          timeout: 10000,        }      );      if (response.status === 200) {        setForgotPasswordMessage("OTP verified! Set your new password.");        setShowOtpInput(false);        setShowNewPasswordInput(true);      }    } catch (err) {      const msg =        err.response?.data?.detail ||        err.response?.data?.otp?.[0] ||        "Invalid OTP. Try again.";      setForgotPasswordMessage(msg);    } finally {      setForgotPasswordLoading(false);    }  };  const handleResetPassword = async (e) => {    e.preventDefault();    if (newPassword !== confirmPassword) {      setForgotPasswordMessage("Passwords do not match.");      return;    }    if (newPassword.length < 6) {      setForgotPasswordMessage("Password must be at least 6 characters.");      return;    }    setResetPasswordLoading(true);    try {      await axios.post(        "http://127.0.0.1:8000/api/auth/password-reset/confirm/",        {          email: forgotPasswordEmail,          otp,          new_password: newPassword,          confirm_password: confirmPassword,        },        {          headers: { "Content-Type": "application/json" },          timeout: 10000,        }      );      setForgotPasswordMessage("Password reset successfully!");      setTimeout(() => handleBackToLogin(), 2000);    } catch (err) {      const msg =        err.response?.data?.detail ||        err.response?.data?.non_field_errors?.[0] ||        "Failed to reset password.";      setForgotPasswordMessage(msg);    } finally {      setResetPasswordLoading(false);    }  };  const handleSwitchToForgotPassword = () => {    setShowForgotPassword(true);    setForgotPasswordEmail(email);    setShowOtpInput(false);    setShowNewPasswordInput(false);    setForgotPasswordMessage("");  };  const handleBackToLogin = () => {    setShowForgotPassword(false);    setShowOtpInput(false);    setShowNewPasswordInput(false);    setForgotPasswordMessage("");    setForgotPasswordEmail("");    setOtp("");    setNewPassword("");    setConfirmPassword("");  };  // ✅ Close handler for all states  const handleClose = () => {    if (onClose) {      onClose();    }  };  // Forgot Password - New Password Input  if (showForgotPassword && showNewPasswordInput) {    return (      <div className="fixed inset-0  bg-opacity-40 flex justify-center items-center z-50 p-4">        <div className="bg-white rounded-xl w-full max-w-md relative p-6 shadow-lg animate-fade-in">          <button            onClick={handleClose}            className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"          >            ✖          </button>          <form onSubmit={handleResetPassword} className="space-y-4">            <h2 className="text-2xl font-bold text-center text-blue-700">              Set New Password            </h2>            <input              type="password"              placeholder="New Password"              value={newPassword}              onChange={(e) => setNewPassword(e.target.value)}              className="w-full p-3 border rounded-lg"              required            />            <input              type="password"              placeholder="Confirm Password"              value={confirmPassword}              onChange={(e) => setConfirmPassword(e.target.value)}              className="w-full p-3 border rounded-lg"              required            />            <button              type="submit"              disabled={resetPasswordLoading}              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50"            >              {resetPasswordLoading ? "Resetting..." : "Reset Password"}            </button>            <p              onClick={handleBackToLogin}              className="text-blue-600 text-center cursor-pointer hover:underline"            >              Back to Login            </p>          </form>        </div>      </div>    );  }  // Forgot Password - OTP Input  if (showForgotPassword && showOtpInput) {    return (      <div className="fixed inset-0  bg-opacity-40 flex justify-center items-center z-50 p-4">        <div className="bg-white rounded-xl w-full max-w-md relative p-6 shadow-lg animate-fade-in">          <button            onClick={handleClose}            className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"          >            ✖          </button>          <form onSubmit={handleVerifyOtp} className="space-y-4">            <h2 className="text-2xl font-bold text-center text-blue-700">              Verify OTP            </h2>            <input              type="text"              placeholder="Enter OTP"              value={otp}              onChange={(e) => setOtp(e.target.value)}              className="w-full p-3 border rounded-lg text-center text-lg"              required              maxLength="6"            />            <button              type="submit"              disabled={forgotPasswordLoading}              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50"            >              {forgotPasswordLoading ? "Verifying..." : "Verify OTP"}            </button>            <p              onClick={handleBackToLogin}              className="text-blue-600 text-center cursor-pointer hover:underline"            >              Back to Login            </p>          </form>        </div>      </div>    );  }  // Forgot Password - Email Input  if (showForgotPassword) {    return (      <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50 p-4">        <div className="bg-white rounded-xl w-full max-w-md relative p-6 shadow-lg animate-fade-in">          <button            onClick={handleClose}            className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"          >            ✖          </button>          <form onSubmit={handleForgotPassword} className="space-y-4">            <h2 className="text-2xl font-bold text-center text-blue-700">              Reset Admin Password            </h2>            <input              type="email"              placeholder="Enter admin email"              value={forgotPasswordEmail}              onChange={(e) => setForgotPasswordEmail(e.target.value)}              className="w-full p-3 border rounded-lg"              required            />            <button              type="submit"              disabled={forgotPasswordLoading}              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50"            >              {forgotPasswordLoading ? "Sending OTP..." : "Send OTP"}            </button>            <p              onClick={handleBackToLogin}              className="text-blue-600 text-center cursor-pointer hover:underline"            >              Back to Login            </p>          </form>        </div>      </div>    );  }  // ✅ Main Admin Login Form  return (    <div className="fixed inset-0  bg-opacity-40 flex justify-center items-center z-50 p-4">      <div className="bg-white rounded-xl w-full max-w-md relative p-6 shadow-lg animate-fade-in">        <button          onClick={handleClose}          disabled={loading}          className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 disabled:opacity-50"        >          ✖        </button>        <form onSubmit={handleLogin} className="space-y-4">          <h2 className="text-2xl font-bold text-center text-blue-700">            Admin Login          </h2>          {error && (            <div className="bg-red-50 text-red-700 border border-red-200 p-3 rounded-lg text-center">              {error}            </div>          )}          <div className="space-y-2">            <label className="text-sm font-medium text-gray-700">Email</label>            <input              type="email"              placeholder="Admin email"              value={email}              onChange={(e) => setEmail(e.target.value)}              disabled={loading}              className="w-full p-3 border rounded-lg disabled:opacity-50"              required            />          </div>          <div className="space-y-2">            <label className="text-sm font-medium text-gray-700">              Password            </label>            <input              type="password"              placeholder="Admin password"              value={password}              onChange={(e) => setPassword(e.target.value)}              disabled={loading}              className="w-full p-3 border rounded-lg disabled:opacity-50"              required            />          </div>          <div className="text-right">            <span              onClick={handleSwitchToForgotPassword}              className="text-sm text-blue-600 cursor-pointer hover:underline"            >              Forgot Password?            </span>          </div>          <button            type="submit"            disabled={loading}            className={`w-full py-3 rounded-lg font-semibold transition-all duration-200 ${              loading                ? "bg-gray-400 text-white cursor-not-allowed"                : "bg-blue-600 text-white hover:bg-blue-700 transform hover:scale-105"            }`}          >            {loading ? "Logging in..." : "Login"}          </button>        </form>      </div>     </div>  );}export default AdminLogin;

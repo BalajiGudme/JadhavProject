@@ -1,603 +1,1 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
-
-// Set base URL for API
-const API_BASE_URL = window.API_BASE_URL || "http://localhost:8000";
-
-// Token utility functions
-const getAuthToken = () => {
-  return localStorage.getItem('access') || localStorage.getItem('authToken');
-};
-
-const refreshAuthToken = async () => {
-  try {
-    const refreshToken = localStorage.getItem('refresh') || sessionStorage.getItem('refresh');
-    if (!refreshToken) {
-      return null;
-    }
-
-    const response = await axios.post(`${API_BASE_URL}/api/token/refresh/`, {
-      refresh: refreshToken
-    });
-
-    if (response.data.access) {
-      localStorage.setItem('access', response.data.access);
-      return response.data.access;
-    }
-  } catch (error) {
-    console.error('Token refresh failed:', error);
-  }
-  return null;
-};
-
-const ArchitectureDashboard = () => {
-  const [activeTab, setActiveTab] = useState('tree');
-  const [treeData, setTreeData] = useState([]);
-  const [architectures, setArchitectures] = useState([]);
-  const [statistics, setStatistics] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const navigate = useNavigate();
-
-  const tabs = [
-    { id: 'tree', label: 'Tree View', icon: '🌳' },
-    { id: 'manage', label: 'Management', icon: '📋' },
-    { id: 'stats', label: 'Statistics', icon: '📊' },
-    { id: 'create', label: 'Create New', icon: '➕' }
-  ];
-
-  // Handle window resize
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Fetch tree data when component mounts or tab changes to tree
-  useEffect(() => {
-    if (activeTab === 'tree') {
-      fetchTreeData();
-    } else if (activeTab === 'manage') {
-      fetchArchitectures();
-    } else if (activeTab === 'stats') {
-      fetchStatistics();
-    }
-  }, [activeTab]);
-
-  const fetchTreeData = async () => {
-    try {
-      setLoading(true);
-      const token = getAuthToken();
-      
-      if (!token) {
-        setError('Please log in to access this page');
-        return;
-      }
-
-      const response = await axios.get(`${API_BASE_URL}/api/architecture-tree/`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      setTreeData(response.data);
-      setError(null);
-    } catch (err) {
-      if (err.response?.status === 401) {
-        const newToken = await refreshAuthToken();
-        if (newToken) {
-          fetchTreeData();
-          return;
-        }
-      }
-      setError('Failed to fetch tree data');
-      console.error('Error fetching tree data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchArchitectures = async () => {
-    try {
-      setLoading(true);
-      const token = getAuthToken();
-      
-      if (!token) {
-        setError('Please log in to access this page');
-        return;
-      }
-
-      const response = await axios.get(`${API_BASE_URL}/api/architecture/`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      setArchitectures(response.data);
-      setError(null);
-    } catch (err) {
-      if (err.response?.status === 401) {
-        const newToken = await refreshAuthToken();
-        if (newToken) {
-          fetchArchitectures();
-          return;
-        }
-      }
-      setError('Failed to fetch architectures');
-      console.error('Error fetching architectures:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchStatistics = async () => {
-    try {
-      setLoading(true);
-      const token = getAuthToken();
-      
-      if (!token) {
-        setError('Please log in to access this page');
-        return;
-      }
-
-      // Fetch overall statistics
-      const [archResponse, tokensResponse] = await Promise.all([
-        axios.get(`${API_BASE_URL}/api/architecture/`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get(`${API_BASE_URL}/api/form-tokens/`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-      ]);
-
-      const totalArchitectures = archResponse.data.length;
-      const allTokens = tokensResponse.data;
-      
-      // Calculate statistics
-      const stats = {
-        totalArchitectures,
-        totalTokens: allTokens.length,
-        usedTokens: allTokens.filter(token => token.is_used).length,
-        unusedTokens: allTokens.filter(token => !token.is_used).length,
-        studentTokens: allTokens.filter(token => token.user_type === 'student').length,
-        staffTokens: allTokens.filter(token => token.user_type === 'staff').length,
-        architecturesWithTokens: [...new Set(allTokens.map(token => token.architecture))].length
-      };
-
-      setStatistics(stats);
-      setError(null);
-    } catch (err) {
-      if (err.response?.status === 401) {
-        const newToken = await refreshAuthToken();
-        if (newToken) {
-          fetchStatistics();
-          return;
-        }
-      }
-      setError('Failed to fetch statistics');
-      console.error('Error fetching statistics:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleNavigateToManagement = () => {
-    navigate('/architecture');
-  };
-
-  const handleNavigateToFormTracker = () => {
-    navigate('/architecture-form-tracker');
-  };
-
-  const handleNavigateToResponses = (architectureId) => {
-    navigate(`/architecture/${architectureId}/responses`);
-  };
-
-  // Recursive function to render tree nodes
-  const renderTreeNodes = (nodes, level = 0) => {
-    const mobilePadding = isMobile ? level * 12 : level * 24;
-    
-    return nodes.map((node) => (
-      <div key={node.id} className={`my-2`} style={{ marginLeft: `${mobilePadding}px` }}>
-        <div 
-          className={`p-3 rounded-lg border cursor-pointer hover:bg-gray-50 transition-colors ${
-            node.student_count > 0 ? 'bg-blue-50 border-blue-200' : 
-            node.staff_count > 0 ? 'bg-green-50 border-green-200' : 
-            'bg-gray-50 border-gray-200'
-          }`}
-          onClick={() => handleNavigateToResponses(node.id)}
-        >
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start sm:items-center">
-              <div className={`w-3 h-3 rounded-full mt-1 sm:mt-0 flex-shrink-0 mr-3 ${
-                node.student_count > 0 ? 'bg-blue-500' : 
-                node.staff_count > 0 ? 'bg-green-500' : 
-                'bg-gray-400'
-              }`}></div>
-              <div className="flex-1 min-w-0">
-                <h4 className="font-semibold text-gray-800 truncate">{node.name}</h4>
-                <p className="text-sm text-gray-600 mt-1">
-                  {node.institution_type && `${node.institution_type} • `}
-                  {node.department_name && `Dept: ${node.department_name}`}
-                </p>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {node.student_count > 0 && (
-                    <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">
-                      Students: {node.student_count}
-                    </span>
-                  )}
-                  {node.staff_count > 0 && (
-                    <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
-                      Staff: {node.staff_count}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="text-right text-sm text-gray-500 mt-2 sm:mt-0 sm:pl-4">
-              ID: {node.id}
-            </div>
-          </div>
-        </div>
-        {node.children && node.children.length > 0 && renderTreeNodes(node.children, level + 1)}
-      </div>
-    ));
-  };
-
-  const renderTreeView = () => {
-    if (loading) {
-      return (
-        <div className="flex flex-col sm:flex-row justify-center items-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          <p className="mt-3 sm:mt-0 sm:ml-3 text-gray-600">Loading tree data...</p>
-        </div>
-      );
-    }
-
-    if (error) {
-      return (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <div className="flex flex-col sm:flex-row">
-            <div className="flex-shrink-0 flex justify-center sm:justify-start">
-              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-0 sm:ml-3 mt-2 sm:mt-0 text-center sm:text-left">
-              <h3 className="text-sm font-medium text-red-800">Error</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
-              <div className="mt-3 flex justify-center sm:justify-start">
-                <button
-                  onClick={fetchTreeData}
-                  className="px-4 py-2 bg-red-100 text-red-700 rounded-md text-sm hover:bg-red-200"
-                >
-                  Retry
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <h3 className="text-lg font-semibold">Organizational Hierarchy</h3>
-          <button
-            onClick={fetchTreeData}
-            className="w-full sm:w-auto px-4 py-2 bg-blue-100 text-blue-700 rounded-md text-sm hover:bg-blue-200 flex items-center justify-center"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Refresh
-          </button>
-        </div>
-        
-        {treeData.length > 0 ? (
-          <div className="border rounded-lg p-3 sm:p-4 bg-white overflow-x-auto">
-            {renderTreeNodes(treeData)}
-          </div>
-        ) : (
-          <div className="text-center py-8 text-gray-500">
-            No organizational data available.
-          </div>
-        )}
-        
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h4 className="font-semibold text-blue-800 mb-3">Tree View Legend</h4>
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 text-sm">
-            <div className="flex items-center justify-center sm:justify-start">
-              <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
-              <span className="text-blue-700">Student Architecture</span>
-            </div>
-            <div className="flex items-center justify-center sm:justify-start">
-              <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-              <span className="text-green-700">Staff Architecture</span>
-            </div>
-            <div className="flex items-center justify-center sm:justify-start">
-              <div className="w-3 h-3 bg-gray-400 rounded-full mr-2"></div>
-              <span className="text-gray-700">General Architecture</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderManagementView = () => {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <h3 className="text-lg font-semibold">Architecture Management</h3>
-          <button
-            onClick={handleNavigateToManagement}
-            className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm sm:text-base"
-          >
-            Open Management Console
-          </button>
-        </div>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="bg-white border rounded-lg p-4">
-            <h4 className="font-semibold mb-3">Quick Actions</h4>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <button 
-                  onClick={() => navigate('/architecture?view=students')}
-                  className="text-blue-600 hover:text-blue-800 w-full text-left py-1"
-                >
-                  View Student Records
-                </button>
-              </li>
-              <li>
-                <button 
-                  onClick={() => navigate('/architecture?view=staff')}
-                  className="text-blue-600 hover:text-blue-800 w-full text-left py-1"
-                >
-                  View Staff Records
-                </button>
-              </li>
-              <li>
-                <button 
-                  onClick={handleNavigateToFormTracker}
-                  className="text-blue-600 hover:text-blue-800 w-full text-left py-1"
-                >
-                  Form Submission Tracker
-                </button>
-              </li>
-            </ul>
-          </div>
-          
-          <div className="bg-white border rounded-lg p-4">
-            <h4 className="font-semibold mb-3">Recent Architectures</h4>
-            {architectures.slice(0, 3).map(arch => (
-              <div key={arch.id} className="text-sm py-2 border-b last:border-b-0">
-                <div className="font-medium truncate">{arch.name}</div>
-                <div className="text-gray-500 text-xs mt-1">
-                  ID: {arch.id} • {arch.student_count || 0} students • {arch.staff_count || 0} staff
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          <div className="bg-white border rounded-lg p-4">
-            <h4 className="font-semibold mb-3">System Status</h4>
-            <div className="text-sm space-y-2">
-              <div className="flex justify-between">
-                <span>Total Architectures:</span>
-                <span className="font-medium">{architectures.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Active Tokens:</span>
-                <span className="font-medium text-green-600">Online</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderStatisticsView = () => {
-    return (
-      <div className="space-y-6">
-        <h3 className="text-lg font-semibold">System Statistics</h3>
-        
-        {loading ? (
-          <div className="flex flex-col sm:flex-row justify-center items-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-            <p className="mt-3 sm:mt-0 sm:ml-3 text-gray-600">Loading statistics...</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-            <div className="bg-white border rounded-lg p-4 sm:p-6 text-center">
-              <div className="text-xl sm:text-2xl font-bold text-blue-600 mb-2">
-                {statistics.totalArchitectures || 0}
-              </div>
-              <div className="text-xs sm:text-sm text-gray-600">Total Architectures</div>
-            </div>
-            
-            <div className="bg-white border rounded-lg p-4 sm:p-6 text-center">
-              <div className="text-xl sm:text-2xl font-bold text-green-600 mb-2">
-                {statistics.totalTokens || 0}
-              </div>
-              <div className="text-xs sm:text-sm text-gray-600">Total Tokens</div>
-            </div>
-            
-            <div className="bg-white border rounded-lg p-4 sm:p-6 text-center">
-              <div className="text-xl sm:text-2xl font-bold text-purple-600 mb-2">
-                {statistics.usedTokens || 0}
-              </div>
-              <div className="text-xs sm:text-sm text-gray-600">Used Tokens</div>
-            </div>
-            
-            <div className="bg-white border rounded-lg p-4 sm:p-6 text-center">
-              <div className="text-xl sm:text-2xl font-bold text-orange-600 mb-2">
-                {statistics.unusedTokens || 0}
-              </div>
-              <div className="text-xs sm:text-sm text-gray-600">Unused Tokens</div>
-            </div>
-          </div>
-        )}
-
-        <div className="bg-white border rounded-lg p-4 sm:p-6">
-          <h4 className="font-semibold mb-4">Token Distribution</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <div>
-              <h5 className="font-medium mb-3">By User Type</h5>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Students:</span>
-                  <span className="font-medium">{statistics.studentTokens || 0}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Staff:</span>
-                  <span className="font-medium">{statistics.staffTokens || 0}</span>
-                </div>
-              </div>
-            </div>
-            <div>
-              <h5 className="font-medium mb-3">Coverage</h5>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Architectures with Tokens:</span>
-                  <span className="font-medium">{statistics.architecturesWithTokens || 0}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Utilization Rate:</span>
-                  <span className="font-medium">
-                    {statistics.totalTokens ? 
-                      Math.round((statistics.usedTokens / statistics.totalTokens) * 100) : 0}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderCreateView = () => {
-    return (
-      <div className="space-y-6">
-        <h3 className="text-lg font-semibold">Create New Architecture</h3>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          <div className="bg-white border rounded-lg p-4 sm:p-6">
-            <h4 className="font-semibold mb-4">Quick Create Options</h4>
-            <div className="space-y-3">
-              <button
-                onClick={() => navigate('/architecture?view=detail&type=student')}
-                className="w-full text-left p-3 sm:p-4 border rounded-lg hover:bg-blue-50 transition-colors"
-              >
-                <div className="font-medium text-blue-700">Create Student Architecture</div>
-                <div className="text-xs sm:text-sm text-gray-600 mt-1">Add a new student department or class</div>
-              </button>
-              
-              <button
-                onClick={() => navigate('/architecture?view=detail&type=staff')}
-                className="w-full text-left p-3 sm:p-4 border rounded-lg hover:bg-green-50 transition-colors"
-              >
-                <div className="font-medium text-green-700">Create Staff Architecture</div>
-                <div className="text-xs sm:text-sm text-gray-600 mt-1">Add a new staff department or unit</div>
-              </button>
-              
-              <button
-                onClick={() => navigate('/architecture?view=detail')}
-                className="w-full text-left p-3 sm:p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className="font-medium text-gray-700">Create General Architecture</div>
-                <div className="text-xs sm:text-sm text-gray-600 mt-1">Add a general organizational unit</div>
-              </button>
-            </div>
-          </div>
-          
-          <div className="bg-white border rounded-lg p-4 sm:p-6">
-            <h4 className="font-semibold mb-4">Bulk Operations</h4>
-            <div className="space-y-3">
-              <button className="w-full text-left p-3 sm:p-4 border rounded-lg hover:bg-purple-50 transition-colors">
-                <div className="font-medium text-purple-700">Import from CSV</div>
-                <div className="text-xs sm:text-sm text-gray-600 mt-1">Bulk import architectures from spreadsheet</div>
-              </button>
-              
-              <button className="w-full text-left p-3 sm:p-4 border rounded-lg hover:bg-orange-50 transition-colors">
-                <div className="font-medium text-orange-700">Generate Multiple Tokens</div>
-                <div className="text-xs sm:text-sm text-gray-600 mt-1">Create tokens for multiple architectures</div>
-              </button>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h4 className="font-semibold text-blue-800 mb-2">Need Help?</h4>
-          <p className="text-sm text-blue-700">
-            For complex organizational structures or bulk operations, contact your system administrator.
-          </p>
-        </div>
-      </div>
-    );
-  };
-
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'tree':
-        return renderTreeView();
-      case 'manage':
-        return renderManagementView();
-      case 'stats':
-        return renderStatisticsView();
-      case 'create':
-        return renderCreateView();
-      default:
-        return renderTreeView();
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50 p-3 sm:p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
-        <header className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Architecture Dashboard</h1>
-          <p className="text-sm sm:text-base text-gray-600">Manage your organizational structure and track form submissions</p>
-        </header>
-
-        {/* Navigation Tabs */}
-        <div className="bg-white rounded-lg shadow-sm mb-4 sm:mb-6 overflow-x-auto">
-          <div className="flex min-w-max sm:min-w-0 sm:flex-wrap border-b">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-4 font-medium transition-colors flex-shrink-0 ${
-                  activeTab === tab.id
-                    ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <span className="text-base sm:text-lg">{tab.icon}</span>
-                <span className="text-sm sm:text-base">{isMobile ? tab.label.split(' ')[0] : tab.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-          {renderContent()}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default ArchitectureDashboard;
+import React, { useState, useEffect } from 'react';import axios from 'axios';import { useNavigate } from 'react-router-dom';// Set base URL for APIconst API_BASE_URL = window.API_BASE_URL || "http://localhost:8000";// Token utility functionsconst getAuthToken = () => {  return localStorage.getItem('access') || localStorage.getItem('authToken');};const refreshAuthToken = async () => {  try {    const refreshToken = localStorage.getItem('refresh') || sessionStorage.getItem('refresh');    if (!refreshToken) {      return null;    }    const response = await axios.post(`${API_BASE_URL}/api/token/refresh/`, {      refresh: refreshToken    });    if (response.data.access) {      localStorage.setItem('access', response.data.access);      return response.data.access;    }  } catch (error) {  }  return null;};const ArchitectureDashboard = () => {  const [activeTab, setActiveTab] = useState('tree');  const [treeData, setTreeData] = useState([]);  const [architectures, setArchitectures] = useState([]);  const [statistics, setStatistics] = useState({});  const [loading, setLoading] = useState(false);  const [error, setError] = useState(null);  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);  const navigate = useNavigate();  const tabs = [    { id: 'tree', label: 'Tree View', icon: '🌳' },    { id: 'manage', label: 'Management', icon: '📋' },    { id: 'stats', label: 'Statistics', icon: '📊' },    { id: 'create', label: 'Create New', icon: '➕' }  ];  // Handle window resize  useEffect(() => {    const handleResize = () => {      setIsMobile(window.innerWidth < 768);    };    window.addEventListener('resize', handleResize);    return () => window.removeEventListener('resize', handleResize);  }, []);  // Fetch tree data when component mounts or tab changes to tree  useEffect(() => {    if (activeTab === 'tree') {      fetchTreeData();    } else if (activeTab === 'manage') {      fetchArchitectures();    } else if (activeTab === 'stats') {      fetchStatistics();    }  }, [activeTab]);  const fetchTreeData = async () => {    try {      setLoading(true);      const token = getAuthToken();      if (!token) {        setError('Please log in to access this page');        return;      }      const response = await axios.get(`${API_BASE_URL}/api/architecture-tree/`, {        headers: {          Authorization: `Bearer ${token}`,          'Content-Type': 'application/json'        }      });      setTreeData(response.data);      setError(null);    } catch (err) {      if (err.response?.status === 401) {        const newToken = await refreshAuthToken();        if (newToken) {          fetchTreeData();          return;        }      }      setError('Failed to fetch tree data');    } finally {      setLoading(false);    }  };  const fetchArchitectures = async () => {    try {      setLoading(true);      const token = getAuthToken();      if (!token) {        setError('Please log in to access this page');        return;      }      const response = await axios.get(`${API_BASE_URL}/api/architecture/`, {        headers: {          Authorization: `Bearer ${token}`,          'Content-Type': 'application/json'        }      });      setArchitectures(response.data);      setError(null);    } catch (err) {      if (err.response?.status === 401) {        const newToken = await refreshAuthToken();        if (newToken) {          fetchArchitectures();          return;        }      }      setError('Failed to fetch architectures');    } finally {      setLoading(false);    }  };  const fetchStatistics = async () => {    try {      setLoading(true);      const token = getAuthToken();      if (!token) {        setError('Please log in to access this page');        return;      }      // Fetch overall statistics      const [archResponse, tokensResponse] = await Promise.all([        axios.get(`${API_BASE_URL}/api/architecture/`, {          headers: { Authorization: `Bearer ${token}` }        }),        axios.get(`${API_BASE_URL}/api/form-tokens/`, {          headers: { Authorization: `Bearer ${token}` }        })      ]);      const totalArchitectures = archResponse.data.length;      const allTokens = tokensResponse.data;      // Calculate statistics      const stats = {        totalArchitectures,        totalTokens: allTokens.length,        usedTokens: allTokens.filter(token => token.is_used).length,        unusedTokens: allTokens.filter(token => !token.is_used).length,        studentTokens: allTokens.filter(token => token.user_type === 'student').length,        staffTokens: allTokens.filter(token => token.user_type === 'staff').length,        architecturesWithTokens: [...new Set(allTokens.map(token => token.architecture))].length      };      setStatistics(stats);      setError(null);    } catch (err) {      if (err.response?.status === 401) {        const newToken = await refreshAuthToken();        if (newToken) {          fetchStatistics();          return;        }      }      setError('Failed to fetch statistics');    } finally {      setLoading(false);    }  };  const handleNavigateToManagement = () => {    navigate('/architecture');  };  const handleNavigateToFormTracker = () => {    navigate('/architecture-form-tracker');  };  const handleNavigateToResponses = (architectureId) => {    navigate(`/architecture/${architectureId}/responses`);  };  // Recursive function to render tree nodes  const renderTreeNodes = (nodes, level = 0) => {    const mobilePadding = isMobile ? level * 12 : level * 24;    return nodes.map((node) => (      <div key={node.id} className={`my-2`} style={{ marginLeft: `${mobilePadding}px` }}>        <div           className={`p-3 rounded-lg border cursor-pointer hover:bg-gray-50 transition-colors ${            node.student_count > 0 ? 'bg-blue-50 border-blue-200' :             node.staff_count > 0 ? 'bg-green-50 border-green-200' :             'bg-gray-50 border-gray-200'          }`}          onClick={() => handleNavigateToResponses(node.id)}        >          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">            <div className="flex items-start sm:items-center">              <div className={`w-3 h-3 rounded-full mt-1 sm:mt-0 flex-shrink-0 mr-3 ${                node.student_count > 0 ? 'bg-blue-500' :                 node.staff_count > 0 ? 'bg-green-500' :                 'bg-gray-400'              }`}></div>              <div className="flex-1 min-w-0">                <h4 className="font-semibold text-gray-800 truncate">{node.name}</h4>                <p className="text-sm text-gray-600 mt-1">                  {node.institution_type && `${node.institution_type} • `}                  {node.department_name && `Dept: ${node.department_name}`}                </p>                <div className="flex flex-wrap gap-2 mt-2">                  {node.student_count > 0 && (                    <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">                      Students: {node.student_count}                    </span>                  )}                  {node.staff_count > 0 && (                    <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">                      Staff: {node.staff_count}                    </span>                  )}                </div>              </div>            </div>            <div className="text-right text-sm text-gray-500 mt-2 sm:mt-0 sm:pl-4">              ID: {node.id}            </div>          </div>        </div>        {node.children && node.children.length > 0 && renderTreeNodes(node.children, level + 1)}      </div>    ));  };  const renderTreeView = () => {    if (loading) {      return (        <div className="flex flex-col sm:flex-row justify-center items-center py-8">          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>          <p className="mt-3 sm:mt-0 sm:ml-3 text-gray-600">Loading tree data...</p>        </div>      );    }    if (error) {      return (        <div className="bg-red-50 border border-red-200 rounded-md p-4">          <div className="flex flex-col sm:flex-row">            <div className="flex-shrink-0 flex justify-center sm:justify-start">              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />              </svg>            </div>            <div className="ml-0 sm:ml-3 mt-2 sm:mt-0 text-center sm:text-left">              <h3 className="text-sm font-medium text-red-800">Error</h3>              <p className="text-sm text-red-700 mt-1">{error}</p>              <div className="mt-3 flex justify-center sm:justify-start">                <button                  onClick={fetchTreeData}                  className="px-4 py-2 bg-red-100 text-red-700 rounded-md text-sm hover:bg-red-200"                >                  Retry                </button>              </div>            </div>          </div>        </div>      );    }    return (      <div className="space-y-4">        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">          <h3 className="text-lg font-semibold">Organizational Hierarchy</h3>          <button            onClick={fetchTreeData}            className="w-full sm:w-auto px-4 py-2 bg-blue-100 text-blue-700 rounded-md text-sm hover:bg-blue-200 flex items-center justify-center"          >            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />            </svg>            Refresh          </button>        </div>        {treeData.length > 0 ? (          <div className="border rounded-lg p-3 sm:p-4 bg-white overflow-x-auto">            {renderTreeNodes(treeData)}          </div>        ) : (          <div className="text-center py-8 text-gray-500">            No organizational data available.          </div>        )}        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">          <h4 className="font-semibold text-blue-800 mb-3">Tree View Legend</h4>          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 text-sm">            <div className="flex items-center justify-center sm:justify-start">              <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>              <span className="text-blue-700">Student Architecture</span>            </div>            <div className="flex items-center justify-center sm:justify-start">              <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>              <span className="text-green-700">Staff Architecture</span>            </div>            <div className="flex items-center justify-center sm:justify-start">              <div className="w-3 h-3 bg-gray-400 rounded-full mr-2"></div>              <span className="text-gray-700">General Architecture</span>            </div>          </div>        </div>      </div>    );  };  const renderManagementView = () => {    return (      <div className="space-y-6">        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">          <h3 className="text-lg font-semibold">Architecture Management</h3>          <button            onClick={handleNavigateToManagement}            className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm sm:text-base"          >            Open Management Console          </button>        </div>        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">          <div className="bg-white border rounded-lg p-4">            <h4 className="font-semibold mb-3">Quick Actions</h4>            <ul className="space-y-2 text-sm">              <li>                <button                   onClick={() => navigate('/architecture?view=students')}                  className="text-blue-600 hover:text-blue-800 w-full text-left py-1"                >                  View Student Records                </button>              </li>              <li>                <button                   onClick={() => navigate('/architecture?view=staff')}                  className="text-blue-600 hover:text-blue-800 w-full text-left py-1"                >                  View Staff Records                </button>              </li>              <li>                <button                   onClick={handleNavigateToFormTracker}                  className="text-blue-600 hover:text-blue-800 w-full text-left py-1"                >                  Form Submission Tracker                </button>              </li>            </ul>          </div>          <div className="bg-white border rounded-lg p-4">            <h4 className="font-semibold mb-3">Recent Architectures</h4>            {architectures.slice(0, 3).map(arch => (              <div key={arch.id} className="text-sm py-2 border-b last:border-b-0">                <div className="font-medium truncate">{arch.name}</div>                <div className="text-gray-500 text-xs mt-1">                  ID: {arch.id} • {arch.student_count || 0} students • {arch.staff_count || 0} staff                </div>              </div>            ))}          </div>          <div className="bg-white border rounded-lg p-4">            <h4 className="font-semibold mb-3">System Status</h4>            <div className="text-sm space-y-2">              <div className="flex justify-between">                <span>Total Architectures:</span>                <span className="font-medium">{architectures.length}</span>              </div>              <div className="flex justify-between">                <span>Active Tokens:</span>                <span className="font-medium text-green-600">Online</span>              </div>            </div>          </div>        </div>      </div>    );  };  const renderStatisticsView = () => {    return (      <div className="space-y-6">        <h3 className="text-lg font-semibold">System Statistics</h3>        {loading ? (          <div className="flex flex-col sm:flex-row justify-center items-center py-8">            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>            <p className="mt-3 sm:mt-0 sm:ml-3 text-gray-600">Loading statistics...</p>          </div>        ) : (          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">            <div className="bg-white border rounded-lg p-4 sm:p-6 text-center">              <div className="text-xl sm:text-2xl font-bold text-blue-600 mb-2">                {statistics.totalArchitectures || 0}              </div>              <div className="text-xs sm:text-sm text-gray-600">Total Architectures</div>            </div>            <div className="bg-white border rounded-lg p-4 sm:p-6 text-center">              <div className="text-xl sm:text-2xl font-bold text-green-600 mb-2">                {statistics.totalTokens || 0}              </div>              <div className="text-xs sm:text-sm text-gray-600">Total Tokens</div>            </div>            <div className="bg-white border rounded-lg p-4 sm:p-6 text-center">              <div className="text-xl sm:text-2xl font-bold text-purple-600 mb-2">                {statistics.usedTokens || 0}              </div>              <div className="text-xs sm:text-sm text-gray-600">Used Tokens</div>            </div>            <div className="bg-white border rounded-lg p-4 sm:p-6 text-center">              <div className="text-xl sm:text-2xl font-bold text-orange-600 mb-2">                {statistics.unusedTokens || 0}              </div>              <div className="text-xs sm:text-sm text-gray-600">Unused Tokens</div>            </div>          </div>        )}        <div className="bg-white border rounded-lg p-4 sm:p-6">          <h4 className="font-semibold mb-4">Token Distribution</h4>          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">            <div>              <h5 className="font-medium mb-3">By User Type</h5>              <div className="space-y-2">                <div className="flex justify-between">                  <span>Students:</span>                  <span className="font-medium">{statistics.studentTokens || 0}</span>                </div>                <div className="flex justify-between">                  <span>Staff:</span>                  <span className="font-medium">{statistics.staffTokens || 0}</span>                </div>              </div>            </div>            <div>              <h5 className="font-medium mb-3">Coverage</h5>              <div className="space-y-2">                <div className="flex justify-between">                  <span>Architectures with Tokens:</span>                  <span className="font-medium">{statistics.architecturesWithTokens || 0}</span>                </div>                <div className="flex justify-between">                  <span>Utilization Rate:</span>                  <span className="font-medium">                    {statistics.totalTokens ?                       Math.round((statistics.usedTokens / statistics.totalTokens) * 100) : 0}%                  </span>                </div>              </div>            </div>          </div>        </div>      </div>    );  };  const renderCreateView = () => {    return (      <div className="space-y-6">        <h3 className="text-lg font-semibold">Create New Architecture</h3>        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">          <div className="bg-white border rounded-lg p-4 sm:p-6">            <h4 className="font-semibold mb-4">Quick Create Options</h4>            <div className="space-y-3">              <button                onClick={() => navigate('/architecture?view=detail&type=student')}                className="w-full text-left p-3 sm:p-4 border rounded-lg hover:bg-blue-50 transition-colors"              >                <div className="font-medium text-blue-700">Create Student Architecture</div>                <div className="text-xs sm:text-sm text-gray-600 mt-1">Add a new student department or class</div>              </button>              <button                onClick={() => navigate('/architecture?view=detail&type=staff')}                className="w-full text-left p-3 sm:p-4 border rounded-lg hover:bg-green-50 transition-colors"              >                <div className="font-medium text-green-700">Create Staff Architecture</div>                <div className="text-xs sm:text-sm text-gray-600 mt-1">Add a new staff department or unit</div>              </button>              <button                onClick={() => navigate('/architecture?view=detail')}                className="w-full text-left p-3 sm:p-4 border rounded-lg hover:bg-gray-50 transition-colors"              >                <div className="font-medium text-gray-700">Create General Architecture</div>                <div className="text-xs sm:text-sm text-gray-600 mt-1">Add a general organizational unit</div>              </button>            </div>          </div>          <div className="bg-white border rounded-lg p-4 sm:p-6">            <h4 className="font-semibold mb-4">Bulk Operations</h4>            <div className="space-y-3">              <button className="w-full text-left p-3 sm:p-4 border rounded-lg hover:bg-purple-50 transition-colors">                <div className="font-medium text-purple-700">Import from CSV</div>                <div className="text-xs sm:text-sm text-gray-600 mt-1">Bulk import architectures from spreadsheet</div>              </button>              <button className="w-full text-left p-3 sm:p-4 border rounded-lg hover:bg-orange-50 transition-colors">                <div className="font-medium text-orange-700">Generate Multiple Tokens</div>                <div className="text-xs sm:text-sm text-gray-600 mt-1">Create tokens for multiple architectures</div>              </button>            </div>          </div>        </div>        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">          <h4 className="font-semibold text-blue-800 mb-2">Need Help?</h4>          <p className="text-sm text-blue-700">            For complex organizational structures or bulk operations, contact your system administrator.          </p>        </div>      </div>    );  };  const renderContent = () => {    switch (activeTab) {      case 'tree':        return renderTreeView();      case 'manage':        return renderManagementView();      case 'stats':        return renderStatisticsView();      case 'create':        return renderCreateView();      default:        return renderTreeView();    }  };  return (    <div className="min-h-screen bg-gray-50 p-3 sm:p-4 md:p-6">      <div className="max-w-7xl mx-auto">        <header className="mb-6 sm:mb-8">          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Architecture Dashboard</h1>          <p className="text-sm sm:text-base text-gray-600">Manage your organizational structure and track form submissions</p>        </header>        {/* Navigation Tabs */}        <div className="bg-white rounded-lg shadow-sm mb-4 sm:mb-6 overflow-x-auto">          <div className="flex min-w-max sm:min-w-0 sm:flex-wrap border-b">            {tabs.map((tab) => (              <button                key={tab.id}                onClick={() => setActiveTab(tab.id)}                className={`flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-4 font-medium transition-colors flex-shrink-0 ${                  activeTab === tab.id                    ? 'text-blue-600 border-b-2 border-blue-600'                    : 'text-gray-500 hover:text-gray-700'                }`}              >                <span className="text-base sm:text-lg">{tab.icon}</span>                <span className="text-sm sm:text-base">{isMobile ? tab.label.split(' ')[0] : tab.label}</span>              </button>            ))}          </div>        </div>        {/* Main Content */}        <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">          {renderContent()}        </div>      </div>    </div>  );};export default ArchitectureDashboard;

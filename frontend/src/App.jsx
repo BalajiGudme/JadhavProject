@@ -1,4 +1,3 @@
-
 //---------------------=18/10/2025================================-----------------------------------------------------
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/Layout";
@@ -37,7 +36,6 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
           <Route path="/student" element={<StudentForm />} />
-          
           {/* Customer protected routes */}
           <Route 
             path="/arch" 
@@ -55,7 +53,6 @@ function App() {
               </ProtectedRoute>
             } 
           /> */}
-          
           {/* Customer Management Routes */}
           <Route 
             path="/formbuilder" 
@@ -98,7 +95,6 @@ function App() {
             } 
           />
         </Route>
-
         {/* Admin routes with AdminLayout */}
         <Route path="/admin">
           <Route element={
@@ -111,7 +107,6 @@ function App() {
             <Route path="/admin/custmsentrecord" element={<CustSentRecord />} />
             <Route path="/admin/architecture/:architectureId/responses" element={<AdminArchitectureResponsesView />} />
             <Route path="/admin/make-id-card" element={<AdminIDCardMaker />} />
-           
             <Route path="dashboard" element={<AdminDashboard/>} />
             <Route path="formbuilder" element={<FormBuilder />} />
             <Route path="forms" element={<FormList />} />
@@ -125,12 +120,10 @@ function App() {
             <Route path="settings" element={<div>Admin Settings</div>} />
           </Route>
         </Route>
-
         {/* Fallback route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
 }
-
 export default App;

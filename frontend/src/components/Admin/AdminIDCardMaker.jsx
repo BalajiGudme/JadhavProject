@@ -1,35 +1,1 @@
-// components/IDCardGenerator.jsx
-import React from 'react';
-
-const IDCardGenerator = () => {
-  return (
-    <div style={{ width: '100%', height: '100vh' }}>
-      <iframe 
-        // src="/21.html" 
-        //  src="/22.html" this ok code 
-          // src="/23.html"   
-          // src="/24.html" 
-          // src="/25.html" 
-          //  src="/26.html"
-          // src="/27.html"
-          // src="/30.html"ok  final
-          // src="/33.html" ok100%
-          // src="/35.html"
-          // src="/37.html
-          // "38
-          // src="/39.html"
-          // src="/40.html"
-          src="/43.html"
-          
-
-
-        width="100%" 
-        height="100%"
-        title="ID Card Generator"
-        style={{ border: 'none' }}
-      />
-    </div>
-  );
-};
-
-export default IDCardGenerator;
+// components/IDCardGenerator.jsximport React from 'react';const IDCardGenerator = () => {  return (    <div style={{ width: '100%', height: '100vh' }}>      <iframe         // src="/21.html"         //  src="/22.html" this ok code           // src="/23.html"             // src="/24.html"           // src="/25.html"           //  src="/26.html"          // src="/27.html"          // src="/30.html"ok  final          // src="/33.html" ok100%          // src="/35.html"          // src="/37.html          // "38          // src="/39.html"          // src="/40.html"          src="/43.html"        width="100%"         height="100%"        title="ID Card Generator"        style={{ border: 'none' }}      />    </div>  );};export default IDCardGenerator;

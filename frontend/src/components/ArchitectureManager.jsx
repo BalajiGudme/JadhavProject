@@ -1,762 +1,369 @@
+// export default ArchitectureManager;
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom'; 
 
-  // export default ArchitectureManager;
-  import React, { useState, useEffect, useRef } from 'react';
-  import { useNavigate } from 'react-router-dom'; 
+const API_BASE_URL = 'http://localhost:8000/api';
 
-  const API_BASE_URL = 'http://localhost:8000/api';
+// Token management utilities
+const getaccess = () => localStorage.getItem('access');
+const getrefresh = () => localStorage.getItem('refresh');
+const setTokens = (access, refresh) => {
+  localStorage.setItem('access', access);
+  localStorage.setItem('refresh', refresh);
+};
+const clearTokens = () => {
+  localStorage.removeItem('access');
+  localStorage.removeItem('refresh');
+};
 
-  // Token management utilities
-  const getaccess = () => localStorage.getItem('access');
-  const getrefresh = () => localStorage.getItem('refresh');
-  const setTokens = (access, refresh) => {
-    localStorage.setItem('access', access);
-    localStorage.setItem('refresh', refresh);
+// Enhanced fetch with token handling
+const createAuthFetch = () => {
+  const refresh = async () => {
+    try {
+      const refresh = getrefresh();
+      if (!refresh) {
+        throw new Error('No refresh token available');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/token/refresh/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Token refresh failed');
+      }
+
+      const data = await response.json();
+      setTokens(data.access, refresh);
+      return data.access;
+    } catch (error) {
+      clearTokens();
+      window.location.href = '/login';
+      throw error;
+    }
   };
-  const clearTokens = () => {
-    localStorage.removeItem('access');
-    localStorage.removeItem('refresh');
-  };
 
-  // Enhanced fetch with token handling
-  const createAuthFetch = () => {
-    const refresh = async () => {
+  const authFetch = async (url, options = {}) => {
+    let access = getaccess();
+    
+    // Set up headers with authorization
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    if (access) {
+      headers['Authorization'] = `Bearer ${access}`;
+    }
+
+    const config = {
+      ...options,
+      headers,
+    };
+
+    let response = await fetch(url, config);
+
+    // If token is expired, try to refresh and retry
+    if (response.status === 401 && access) {
       try {
-        const refresh = getrefresh();
-        if (!refresh) {
-          throw new Error('No refresh token available');
-        }
-
-        const response = await fetch(`${API_BASE_URL}/token/refresh/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ refresh }),
+        access = await refresh();
+        headers['Authorization'] = `Bearer ${access}`;
+        
+        // Retry the original request with new token
+        response = await fetch(url, {
+          ...config,
+          headers,
         });
+      } catch (error) {
+        // Refresh failed, redirect to login
+        clearTokens();
+        window.location.href = '/login';
+        return response;
+      }
+    }
 
+    return response;
+  };
+
+  return authFetch;
+};
+
+// QR Code Generation Page Component
+const QRCodeGenerationPage = ({ selectedArchitectures, onBack, existingTokens = null }) => {
+  const [selectedForm, setSelectedForm] = useState('');
+  const [qrCodes, setQrCodes] = useState([]);
+  const [forms, setForms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  const authFetch = createAuthFetch();
+
+  // Calculate total count from selected architectures
+  const totalCount = selectedArchitectures.reduce((total, arch) => {
+    return total + (arch.student_count || 0) + (arch.staff_count || 0);
+  }, 0);
+
+  // Calculate live available count
+  const liveAvailableCount = selectedArchitectures.reduce((total, arch) => {
+    return total + (arch.live_student_count || 0) + (arch.live_staff_count || 0);
+  }, 0);
+
+  // Load QR.js library
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
+    document.head.appendChild(script);
+
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, []);
+
+  // Fetch published forms
+  useEffect(() => {
+    const fetchPublishedForms = async () => {
+      try {
+        setLoading(true);
+        const response = await authFetch(`${API_BASE_URL}/forms/`);
+        
         if (!response.ok) {
-          throw new Error('Token refresh failed');
+          throw new Error('Failed to fetch forms');
         }
 
         const data = await response.json();
-        setTokens(data.access, refresh);
-        return data.access;
-      } catch (error) {
-        console.error('Token refresh failed:', error);
-        clearTokens();
-        window.location.href = '/login';
-        throw error;
-      }
-    };
-
-    const authFetch = async (url, options = {}) => {
-      let access = getaccess();
-      
-      // Set up headers with authorization
-      const headers = {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      };
-
-      if (access) {
-        headers['Authorization'] = `Bearer ${access}`;
-      }
-
-      const config = {
-        ...options,
-        headers,
-      };
-
-      let response = await fetch(url, config);
-
-      // If token is expired, try to refresh and retry
-      if (response.status === 401 && access) {
-        try {
-          access = await refresh();
-          headers['Authorization'] = `Bearer ${access}`;
-          
-          // Retry the original request with new token
-          response = await fetch(url, {
-            ...config,
-            headers,
-          });
-        } catch (error) {
-          // Refresh failed, redirect to login
-          clearTokens();
-          window.location.href = '/login';
-          return response;
-        }
-      }
-
-      return response;
-    };
-
-    return authFetch;
-  };
-
-  // QR Code Generation Page Component
-  const QRCodeGenerationPage = ({ selectedArchitectures, onBack, existingTokens = null }) => {
-    const [selectedForm, setSelectedForm] = useState('');
-    const [qrCodes, setQrCodes] = useState([]);
-    const [forms, setForms] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [generating, setGenerating] = useState(false);
-    const [error, setError] = useState(null);
-    const [success, setSuccess] = useState(null);
-    const authFetch = createAuthFetch();
-
-    // Calculate total count from selected architectures
-    const totalCount = selectedArchitectures.reduce((total, arch) => {
-      return total + (arch.student_count || 0) + (arch.staff_count || 0);
-    }, 0);
-
-    // Calculate live available count
-    const liveAvailableCount = selectedArchitectures.reduce((total, arch) => {
-      return total + (arch.live_student_count || 0) + (arch.live_staff_count || 0);
-    }, 0);
-
-    // Load QR.js library
-    useEffect(() => {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
-      script.onload = () => {
-        console.log('QR library loaded');
-      };
-      document.head.appendChild(script);
-
-      return () => {
-        document.head.removeChild(script);
-      };
-    }, []);
-
-    // Fetch published forms
-    useEffect(() => {
-      const fetchPublishedForms = async () => {
-        try {
-          setLoading(true);
-          const response = await authFetch(`${API_BASE_URL}/forms/`);
-          
-          if (!response.ok) {
-            throw new Error('Failed to fetch forms');
-          }
-
-          const data = await response.json();
-          const publishedForms = data.filter(form => form.is_published);
-          
-          setForms(publishedForms);
-          setError(null);
-        } catch (error) {
-          console.error('Error fetching published forms:', error);
-          setError('Failed to load forms. Please try again.');
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      fetchPublishedForms();
-    }, []);
-
-    // Filter existing tokens to only show those for selected architectures
-    useEffect(() => {
-      if (existingTokens && existingTokens.length > 0) {
-        const selectedArchIds = selectedArchitectures.map(arch => arch.id);
-        const filteredTokens = existingTokens.filter(token => 
-          selectedArchIds.includes(token.backendData.architecture)
-        );
+        const publishedForms = data.filter(form => form.is_published);
         
-        setQrCodes(filteredTokens);
-        setSuccess(`Loaded ${filteredTokens.length} existing tokens for selected architectures`);
+        setForms(publishedForms);
+        setError(null);
+      } catch (error) {
+        setError('Failed to load forms. Please try again.');
+      } finally {
+        setLoading(false);
       }
-    }, [existingTokens, selectedArchitectures]);
+    };
 
-    const generateQRCodes = async () => {
-      if (!selectedForm) {
-        alert('Please select a form first');
+    fetchPublishedForms();
+  }, []);
+
+  // Filter existing tokens to only show those for selected architectures
+  useEffect(() => {
+    if (existingTokens && existingTokens.length > 0) {
+      const selectedArchIds = selectedArchitectures.map(arch => arch.id);
+      const filteredTokens = existingTokens.filter(token => 
+        selectedArchIds.includes(token.backendData.architecture)
+      );
+      
+      setQrCodes(filteredTokens);
+      setSuccess(`Loaded ${filteredTokens.length} existing tokens for selected architectures`);
+    }
+  }, [existingTokens, selectedArchitectures]);
+
+  const generateQRCodes = async () => {
+    if (!selectedForm) {
+      alert('Please select a form first');
+      return;
+    }
+
+    setGenerating(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      // Prepare the request data for each architecture
+      const requests = selectedArchitectures.flatMap(arch => {
+        const requestsForArch = [];
+        
+        // Calculate how many new tokens to generate based on live counts
+        const studentTokensNeeded = Math.max(0, (arch.student_count || 0) - (arch.live_student_count || 0));
+        const staffTokensNeeded = Math.max(0, (arch.staff_count || 0) - (arch.live_staff_count || 0));
+        
+        // Create requests for students
+        for (let i = 0; i < studentTokensNeeded; i++) {
+          requestsForArch.push({
+            form_id: parseInt(selectedForm),
+            architecture_id: arch.id,
+            count: 1, // Generate 1 token per request
+            user_type: 'student'
+          });
+        }
+        
+        // Create requests for staff
+        for (let i = 0; i < staffTokensNeeded; i++) {
+          requestsForArch.push({
+            form_id: parseInt(selectedForm),
+            architecture_id: arch.id,
+            count: 1, // Generate 1 token per request
+            user_type: 'staff'
+          });
+        }
+        
+        return requestsForArch;
+      });
+
+      // If no tokens needed (all are already available)
+      if (requests.length === 0) {
+        setSuccess('All tokens are already available. No new tokens needed.');
+        setGenerating(false);
         return;
       }
 
-      setGenerating(true);
-      setError(null);
-      setSuccess(null);
+      // Make all API calls
+      const responses = await Promise.all(
+        requests.map(request => 
+          authFetch(`${API_BASE_URL}/form-tokens/generate-multiple/`, {
+            method: 'POST',
+            body: JSON.stringify(request)
+          })
+        )
+      );
 
-      try {
-        // Prepare the request data for each architecture
-        const requests = selectedArchitectures.flatMap(arch => {
-          const requestsForArch = [];
-          
-          // Calculate how many new tokens to generate based on live counts
-          const studentTokensNeeded = Math.max(0, (arch.student_count || 0) - (arch.live_student_count || 0));
-          const staffTokensNeeded = Math.max(0, (arch.staff_count || 0) - (arch.live_staff_count || 0));
-          
-          // Create requests for students
-          for (let i = 0; i < studentTokensNeeded; i++) {
-            requestsForArch.push({
-              form_id: parseInt(selectedForm),
-              architecture_id: arch.id,
-              count: 1, // Generate 1 token per request
-              user_type: 'student'
-            });
-          }
-          
-          // Create requests for staff
-          for (let i = 0; i < staffTokensNeeded; i++) {
-            requestsForArch.push({
-              form_id: parseInt(selectedForm),
-              architecture_id: arch.id,
-              count: 1, // Generate 1 token per request
-              user_type: 'staff'
-            });
-          }
-          
-          return requestsForArch;
-        });
+      // Check all responses
+      const errors = [];
+      const results = [];
 
-        console.log('Prepared requests:', requests);
-
-        // If no tokens needed (all are already available)
-        if (requests.length === 0) {
-          setSuccess('All tokens are already available. No new tokens needed.');
-          setGenerating(false);
-          return;
-        }
-
-        // Make all API calls
-        const responses = await Promise.all(
-          requests.map(request => 
-            authFetch(`${API_BASE_URL}/form-tokens/generate-multiple/`, {
-              method: 'POST',
-              body: JSON.stringify(request)
-            })
-          )
-        );
-
-        // Check all responses
-        const errors = [];
-        const results = [];
-
-        for (const response of responses) {
-          if (!response.ok) {
-            const errorText = await response.text();
-            errors.push(`Server returned ${response.status}: ${errorText}`);
-          } else {
-            const result = await response.json();
-            results.push(result);
-          }
-        }
-
-        if (errors.length > 0) {
-          throw new Error(errors.join('; '));
-        }
-
-        // Process all results
-        const allTokens = results.flatMap(result => {
-          if (Array.isArray(result)) {
-            return result;
-          } else if (result.success && Array.isArray(result.tokens)) {
-            return result.tokens;
-          } else {
-            return [];
-          }
-        });
-
-        setSuccess(`Successfully generated ${allTokens.length} tokens`);
-        
-        // Transform the backend response into QR code data
-        const newQrCodes = allTokens.map(token => {
-          const redirectUrl = `http://localhost:5173/student`;
-          const qrData = {
-            formId: token.form,
-            formName: token.form_title || 'Unknown Form',
-            architectureId: token.architecture,
-            architectureName: token.architecture_name || 'Unknown Architecture',
-            token: token.token,
-            timestamp: token.created_at || new Date().toISOString(),
-            id: token.id,
-            isValid: token.is_valid,
-            isUsed: token.is_used,
-            redirectUrl: redirectUrl
-          };
-          
-          return {
-            id: token.id,
-            token: token.token,
-            qrValue: redirectUrl,
-            displayData: qrData,
-            form: token.form_title || 'Unknown Form',
-            architecture: token.architecture_name || 'Unknown',
-            userType: token.user_type || 'User',
-            backendData: token
-          };
-        });
-        
-        setQrCodes(newQrCodes);
-        
-        // Refresh parent component to update live counts
-        if (typeof onBack === 'function') {
-          // Trigger a refresh in parent
-          setTimeout(() => {
-            if (window.refreshArchitectures) {
-              window.refreshArchitectures();
-            }
-          }, 1000);
-        }
-      } catch (error) {
-        console.error('Error generating QR codes:', error);
-        setError(error.message || 'Failed to generate QR codes. Please try again.');
-      } finally {
-        setGenerating(false);
-      }
-    };
-
-    const downloadQRCode = async (qrCode) => {
-      try {
-        // Create a temporary canvas to generate the QR code
-        const canvas = document.createElement('canvas');
-        const size = 300;
-        canvas.width = size;
-        canvas.height = size;
-        
-        if (window.QRious) {
-          const qr = new window.QRious({
-            element: canvas,
-            value: qrCode.qrValue,
-            size: size,
-            level: 'M'
-          });
-          
-          // Download the canvas as PNG
-          const link = document.createElement('a');
-          link.download = `qrcode-${qrCode.token}.png`;
-          link.href = canvas.toDataURL();
-          link.click();
+      for (const response of responses) {
+        if (!response.ok) {
+          const errorText = await response.text();
+          errors.push(`Server returned ${response.status}: ${errorText}`);
         } else {
-          // Fallback: download as text file with all backend data
-          const content = `QR Code Information:
-  Token: ${qrCode.token}
-  Form: ${qrCode.form} (ID: ${qrCode.backendData.form})
-  Architecture: ${qrCode.architecture} (ID: ${qrCode.backendData.architecture})
-  Status: ${qrCode.backendData.is_valid ? 'Valid' : 'Invalid'} ${qrCode.backendData.is_used ? '(Used)' : '(Unused)'}
-  Created: ${new Date(qrCode.backendData.created_at).toLocaleString()}
-  Backend ID: ${qrCode.backendData.id}
-
-  QR Data: ${qrCode.qrValue}`;
-          
-          const blob = new Blob([content], { type: 'text/plain' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `qrcode-${qrCode.token}.txt`;
-          a.click();
-          URL.revokeObjectURL(url);
+          const result = await response.json();
+          results.push(result);
         }
-      } catch (error) {
-        console.error('Error downloading QR code:', error);
-        alert('Error downloading QR code. Please try again.');
       }
-    };
 
+      if (errors.length > 0) {
+        throw new Error(errors.join('; '));
+      }
 
-// const downloadQRCodesPDF = async () => {
-//   try {
-//     console.log("Starting PDF generation...");
-//     console.log("QR Codes data:", qrCodes);
-    
-//     // Define loadJsPDF inside the function
-//     const loadJsPDF = () => {
-//       return new Promise((resolve, reject) => {
-//         if (window.jspdf) {
-//           console.log("jsPDF already loaded");
-//           resolve();
-//           return;
-//         }
+      // Process all results
+      const allTokens = results.flatMap(result => {
+        if (Array.isArray(result)) {
+          return result;
+        } else if (result.success && Array.isArray(result.tokens)) {
+          return result.tokens;
+        } else {
+          return [];
+        }
+      });
+
+      setSuccess(`Successfully generated ${allTokens.length} tokens`);
+      
+      // Transform the backend response into QR code data
+      const newQrCodes = allTokens.map(token => {
+        const redirectUrl = `http://localhost:5173/student`;
+        const qrData = {
+          formId: token.form,
+          formName: token.form_title || 'Unknown Form',
+          architectureId: token.architecture,
+          architectureName: token.architecture_name || 'Unknown Architecture',
+          token: token.token,
+          timestamp: token.created_at || new Date().toISOString(),
+          id: token.id,
+          isValid: token.is_valid,
+          isUsed: token.is_used,
+          redirectUrl: redirectUrl
+        };
         
-//         console.log("Loading jsPDF script...");
-//         const script = document.createElement('script');
-//         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        return {
+          id: token.id,
+          token: token.token,
+          qrValue: redirectUrl,
+          displayData: qrData,
+          form: token.form_title || 'Unknown Form',
+          architecture: token.architecture_name || 'Unknown',
+          userType: token.user_type || 'User',
+          backendData: token
+        };
+      });
+      
+      setQrCodes(newQrCodes);
+      
+      // Refresh parent component to update live counts
+      if (typeof onBack === 'function') {
+        // Trigger a refresh in parent
+        setTimeout(() => {
+          if (window.refreshArchitectures) {
+            window.refreshArchitectures();
+          }
+        }, 1000);
+      }
+    } catch (error) {
+      setError(error.message || 'Failed to generate QR codes. Please try again.');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const downloadQRCode = async (qrCode) => {
+    try {
+      // Create a temporary canvas to generate the QR code
+      const canvas = document.createElement('canvas');
+      const size = 300;
+      canvas.width = size;
+      canvas.height = size;
+      
+      if (window.QRious) {
+        const qr = new window.QRious({
+          element: canvas,
+          value: qrCode.qrValue,
+          size: size,
+          level: 'M'
+        });
         
-//         script.onload = () => {
-//           console.log("jsPDF script loaded");
-//           setTimeout(() => {
-//             if (window.jspdf) {
-//               console.log("jsPDF initialized successfully");
-//               resolve();
-//             } else {
-//               reject(new Error("jsPDF loaded but not initialized"));
-//             }
-//           }, 100);
-//         };
+        // Download the canvas as PNG
+        const link = document.createElement('a');
+        link.download = `qrcode-${qrCode.token}.png`;
+        link.href = canvas.toDataURL();
+        link.click();
+      } else {
+        // Fallback: download as text file with all backend data
+        const content = `QR Code Information:
+Token: ${qrCode.token}
+Form: ${qrCode.form} (ID: ${qrCode.backendData.form})
+Architecture: ${qrCode.architecture} (ID: ${qrCode.backendData.architecture})
+Status: ${qrCode.backendData.is_valid ? 'Valid' : 'Invalid'} ${qrCode.backendData.is_used ? '(Used)' : '(Unused)'}
+Created: ${new Date(qrCode.backendData.created_at).toLocaleString()}
+Backend ID: ${qrCode.backendData.id}
+
+QR Data: ${qrCode.qrValue}`;
         
-//         script.onerror = () => {
-//           reject(new Error("Failed to load jsPDF script"));
-//         };
-        
-//         document.head.appendChild(script);
-//       });
-//     };
-
-//     // Define loadQRious inside the function
-//     const loadQRious = () => {
-//       return new Promise((resolve, reject) => {
-//         if (window.QRious) {
-//           resolve();
-//           return;
-//         }
-        
-//         const script = document.createElement('script');
-//         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
-        
-//         script.onload = () => {
-//           console.log('QRious loaded successfully');
-//           resolve();
-//         };
-        
-//         script.onerror = () => {
-//           reject(new Error('Failed to load QRious'));
-//         };
-        
-//         document.head.appendChild(script);
-//       });
-//     };
-    
-//     // Load jsPDF first
-//     console.log("Loading jsPDF...");
-//     if (!window.jspdf) {
-//       await loadJsPDF();
-//     }
-    
-//     // Verify jsPDF loaded
-//     if (!window.jspdf) {
-//       throw new Error("jsPDF failed to load");
-//     }
-    
-//     // Load QRious
-//     if (!window.QRious) {
-//       console.log("Loading QRious...");
-//       await loadQRious();
-//     }
-    
-//     const { jsPDF } = window.jspdf;
-//     console.log("jsPDF loaded successfully");
-    
-//     const pdf = new jsPDF({
-//       orientation: 'portrait',
-//       unit: 'mm',
-//       format: 'a4'
-//     });
-    
-//     const pageWidth = pdf.internal.pageSize.getWidth();
-//     const pageHeight = pdf.internal.pageSize.getHeight();
-    
-//     // Grid settings for 4 columns × 10 rows = 40 QR codes per page
-//     const cols = 4;
-//     const rows = 10;
-//     const margin = 5;
-    
-//     const cellWidth = (pageWidth - 2 * margin) / cols;
-//     const cellHeight = (pageHeight - 2 * margin) / rows;
-    
-//     // Create authFetch function
-//     const authFetch = async (url, options = {}) => {
-//       let access = localStorage.getItem('access');
-//       const refreshToken = localStorage.getItem('refresh');
-      
-//       const headers = {
-//         'Content-Type': 'application/json',
-//         ...options.headers,
-//       };
-
-//       if (access) {
-//         headers['Authorization'] = `Bearer ${access}`;
-//       }
-
-//       const config = {
-//         ...options,
-//         headers,
-//       };
-
-//       let response = await fetch(url, config);
-
-//       // If token is expired, try to refresh
-//       if (response.status === 401 && access && refreshToken) {
-//         try {
-//           const refreshResponse = await fetch(`${API_BASE_URL}/token/refresh/`, {
-//             method: 'POST',
-//             headers: { 'Content-Type': 'application/json' },
-//             body: JSON.stringify({ refresh: refreshToken })
-//           });
-          
-//           if (refreshResponse.ok) {
-//             const data = await refreshResponse.json();
-//             localStorage.setItem('access', data.access);
-//             access = data.access;
-            
-//             headers['Authorization'] = `Bearer ${access}`;
-//             response = await fetch(url, { ...config, headers });
-//           }
-//         } catch (error) {
-//           console.error('Token refresh failed:', error);
-//           return response;
-//         }
-//       }
-
-//       return response;
-//     };
-    
-//     // ===== FETCH ALL ARCHITECTURES FIRST =====
-//     console.log("Fetching all architectures from:", `${API_BASE_URL}/architecture/`);
-//     const architecturesResponse = await authFetch(`${API_BASE_URL}/architecture/`);
-    
-//     let allArchitectures = [];
-//     if (architecturesResponse.ok) {
-//       allArchitectures = await architecturesResponse.json();
-//       console.log(`Fetched ${allArchitectures.length} architectures`);
-//     } else {
-//       console.error("Failed to fetch architectures:", architecturesResponse.status);
-//       throw new Error("Failed to fetch architecture data");
-//     }
-    
-//     // Create a map of architecture ID to architecture data for quick lookup
-//     const architectureMap = {};
-//     allArchitectures.forEach(arch => {
-//       architectureMap[arch.id] = arch;
-//     });
-    
-//     // Get all unique architecture IDs from qrCodes
-//     const architectureIds = [];
-//     for (const qrCode of qrCodes) {
-//       const archId = qrCode.backendData?.architecture;
-//       if (archId && !architectureIds.includes(archId)) {
-//         architectureIds.push(archId);
-//       }
-//     }
-    
-//     console.log("Architecture IDs found in QR codes:", architectureIds);
-    
-//     // Process each QR code
-//     for (let index = 0; index < qrCodes.length; index++) {
-//       const qrCode = qrCodes[index];
-//       const positionOnPage = index % (cols * rows);
-      
-//       // Add new page if needed (after every 40 QR codes)
-//       if (index > 0 && positionOnPage === 0) {
-//         pdf.addPage();
-//       }
-      
-//       // Calculate cell position
-//       const row = Math.floor(positionOnPage / cols);
-//       const col = positionOnPage % cols;
-      
-//       const cellX = margin + (col * cellWidth);
-//       const cellY = margin + (row * cellHeight);
-      
-//       // Draw cell border
-//       pdf.setDrawColor(200, 200, 200);
-//       pdf.setLineWidth(0.1);
-//       pdf.rect(cellX, cellY, cellWidth, cellHeight);
-      
-//       // Add serial number
-//       pdf.setFontSize(8);
-//       pdf.setFont('helvetica', 'bold');
-//       pdf.text(`#${index + 1}`, cellX + 2, cellY + 4);
-      
-//       // Get architecture ID from QR code
-//       const architectureId = qrCode.backendData?.architecture;
-      
-//       // Get architecture details from our map (using the ID to look up in allArchitectures)
-//       const archDetails = architectureMap[architectureId] || {};
-      
-//       // Extract data from architecture details
-//       const name = archDetails.name || qrCode.architecture || 'N/A';
-//       const department = archDetails.department_name || 'N/A';
-//       const className = archDetails.class_name || 'N/A';
-//       const division = archDetails.division || 'N/A';
-//       const institutionType = archDetails.institution_type || 'N/A';
-      
-//       // Get the full link from qrCode
-//       const fullLink = qrCode.qrValue || 'http://localhost:5173/student';
-      
-//       // Log for first item to debug
-//       if (index === 0) {
-//         console.log('=== FIRST QR CODE DATA ===');
-//         console.log('Architecture ID:', architectureId);
-//         console.log('Architecture Details from /api/architecture/:', archDetails);
-//         console.log('Name:', name);
-//         console.log('Department:', department);
-//         console.log('Class:', className);
-//         console.log('Division:', division);
-//         console.log('Full Link:', fullLink);
-//         console.log('==========================');
-//       }
-      
-//       // Add text information on LEFT side
-//       pdf.setFontSize(5.5);
-      
-//       let textY = cellY + 8;
-      
-//       // ARCHITECTURE ID
-//       pdf.setFont('helvetica', 'bold');
-//       pdf.text('Arch ID:', cellX + 2, textY);
-//       pdf.setFont('helvetica', 'normal');
-//       pdf.text(String(architectureId || 'N/A'), cellX + 12, textY);
-//       textY += 3.5;
-      
-//       // NAME
-//       pdf.setFont('helvetica', 'bold');
-//       pdf.text('Name:', cellX + 2, textY);
-//       pdf.setFont('helvetica', 'normal');
-//       const nameLines = pdf.splitTextToSize(name, 30);
-//       pdf.text(nameLines[0], cellX + 12, textY);
-//       textY += 3.5;
-      
-//       // DEPARTMENT
-//       pdf.setFont('helvetica', 'bold');
-//       pdf.text('Dept:', cellX + 2, textY);
-//       pdf.setFont('helvetica', 'normal');
-//       const deptLines = pdf.splitTextToSize(department, 30);
-//       pdf.text(deptLines[0], cellX + 12, textY);
-//       textY += 3.5;
-      
-//       // CLASS
-//       pdf.setFont('helvetica', 'bold');
-//       pdf.text('Class:', cellX + 2, textY);
-//       pdf.setFont('helvetica', 'normal');
-//       const classLines = pdf.splitTextToSize(className, 30);
-//       pdf.text(classLines[0], cellX + 12, textY);
-//       textY += 3.5;
-      
-//       // DIVISION
-//       pdf.setFont('helvetica', 'bold');
-//       pdf.text('Div:', cellX + 2, textY);
-//       pdf.setFont('helvetica', 'normal');
-//       const divLines = pdf.splitTextToSize(division, 30);
-//       pdf.text(divLines[0], cellX + 12, textY);
-//       textY += 3.5;
-      
-//       // LINK - Now showing the full URL
-//       pdf.setFont('helvetica', 'bold');
-//       pdf.text('Link:', cellX + 2, textY);
-//       pdf.setFont('helvetica', 'normal');
-//       pdf.setTextColor(0, 0, 255);
-      
-//       // Split the link to fit in the cell
-//       const linkLines = pdf.splitTextToSize(fullLink, 35);
-//       pdf.text(linkLines[0], cellX + 10, textY);
-//       textY += 3;
-//       if (linkLines.length > 1) {
-//         pdf.text(linkLines[1], cellX + 10, textY);
-//       }
-      
-//       pdf.setTextColor(0, 0, 0);
-      
-//       // Add QR code on RIGHT side
-//       if (window.QRious) {
-//         try {
-//           const canvas = document.createElement('canvas');
-//           canvas.width = 150;
-//           canvas.height = 150;
-          
-//           new window.QRious({
-//             element: canvas,
-//             value: qrCode.qrValue || 'http://localhost:5173/student',
-//             size: 150,
-//             level: 'M'
-//           });
-          
-//           const qrImage = canvas.toDataURL('image/png');
-//           const qrSize = 15;
-//           const qrX = cellX + cellWidth - qrSize - 3;
-//           const qrY = cellY + 3;
-          
-//           pdf.addImage(qrImage, 'PNG', qrX, qrY, qrSize, qrSize);
-          
-//         } catch (qrError) {
-//           console.error(`Error generating QR for index ${index}:`, qrError);
-//         }
-//       }
-//     }
-    
-//     // Add page numbers
-//     const totalPages = pdf.internal.getNumberOfPages();
-//     for (let i = 1; i <= totalPages; i++) {
-//       pdf.setPage(i);
-//       pdf.setFontSize(8);
-//       pdf.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
-//     }
-    
-//     // Save PDF
-//     const fileName = `qrcodes-${new Date().toISOString().split('T')[0]}.pdf`;
-//     pdf.save(fileName);
-    
-//     alert(`PDF generated successfully with ${qrCodes.length} QR codes!`);
-    
-//   } catch (error) {
-//     console.error('Error in PDF generation:', error);
-//     alert('Error generating PDF: ' + error.message);
-//   }
-// };
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `qrcode-${qrCode.token}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      alert('Error downloading QR code. Please try again.');
+    }
+  };
 
 
-
-
-
-
-
-
-    
-  //   const downloadAllQRCodes = () => {
-  //     // Get architecture and form from first QR code (assuming they're the same for all)
-  //     const architectureName = qrCodes.length > 0 ? qrCodes[0].architecture : 'N/A';
-  //     const formName = qrCodes.length > 0 ? qrCodes[0].form : 'N/A';
-      
-  //     // Create header
-  //     const header = `Architecture: ${architectureName}
-  // Form: ${formName}
-  // Generated: ${new Date().toLocaleString()}
-  // ${'='.repeat(40)}
-
-  // Sr.No. | Token
-  // ${'-'.repeat(40)}`;
-      
-  //     // Add tokens with serial numbers
-  //     const tokensWithSrNo = qrCodes.map((qr, index) => 
-  //       `${String(index + 1).padStart(5)} | ${qr.token}`
-  //     ).join('\n');
-      
-  //     // Combine header and tokens
-  //     const content = `${header}\n${tokensWithSrNo}`;
-      
-  //     const blob = new Blob([content], { type: 'text/plain' });
-  //     const url = URL.createObjectURL(blob);
-  //     const a = document.createElement('a');
-  //     a.href = url;
-  //     a.download = `tokens-${new Date().toISOString().split('T')[0]}.txt`;
-  //     a.click();
-  //     URL.revokeObjectURL(url);
-  // };
 
 const downloadQRCodesPDF = async () => {
   try {
-    console.log("Starting PDF generation...");
-    console.log("QR Codes data:", qrCodes);
     
     // Define loadJsPDF inside the function
     const loadJsPDF = () => {
       return new Promise((resolve, reject) => {
         if (window.jspdf) {
-          console.log("jsPDF already loaded");
           resolve();
           return;
         }
         
-        console.log("Loading jsPDF script...");
         const script = document.createElement('script');
         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
         
         script.onload = () => {
-          console.log("jsPDF script loaded");
           setTimeout(() => {
             if (window.jspdf) {
-              console.log("jsPDF initialized successfully");
               resolve();
             } else {
               reject(new Error("jsPDF loaded but not initialized"));
@@ -784,7 +391,6 @@ const downloadQRCodesPDF = async () => {
         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
         
         script.onload = () => {
-          console.log('QRious loaded successfully');
           resolve();
         };
         
@@ -797,7 +403,6 @@ const downloadQRCodesPDF = async () => {
     };
     
     // Load jsPDF first
-    console.log("Loading jsPDF...");
     if (!window.jspdf) {
       await loadJsPDF();
     }
@@ -809,12 +414,10 @@ const downloadQRCodesPDF = async () => {
     
     // Load QRious
     if (!window.QRious) {
-      console.log("Loading QRious...");
       await loadQRious();
     }
     
     const { jsPDF } = window.jspdf;
-    console.log("jsPDF loaded successfully");
     
     const pdf = new jsPDF({
       orientation: 'portrait',
@@ -872,7 +475,6 @@ const downloadQRCodesPDF = async () => {
             response = await fetch(url, { ...config, headers });
           }
         } catch (error) {
-          console.error('Token refresh failed:', error);
           return response;
         }
       }
@@ -881,15 +483,12 @@ const downloadQRCodesPDF = async () => {
     };
     
     // ===== FETCH ALL ARCHITECTURES FIRST =====
-    console.log("Fetching all architectures from:", `${API_BASE_URL}/architecture/`);
     const architecturesResponse = await authFetch(`${API_BASE_URL}/architecture/`);
     
     let allArchitectures = [];
     if (architecturesResponse.ok) {
       allArchitectures = await architecturesResponse.json();
-      console.log(`Fetched ${allArchitectures.length} architectures`);
     } else {
-      console.error("Failed to fetch architectures:", architecturesResponse.status);
       throw new Error("Failed to fetch architecture data");
     }
     
@@ -907,8 +506,6 @@ const downloadQRCodesPDF = async () => {
         architectureIds.push(archId);
       }
     }
-    
-    console.log("Architecture IDs found in QR codes:", architectureIds);
     
     // Process each QR code
     for (let index = 0; index < qrCodes.length; index++) {
@@ -953,26 +550,8 @@ const downloadQRCodesPDF = async () => {
       // Get the full link from qrCode
       const fullLink = qrCode.qrValue || 'http://localhost:5173/student';
       
-      // Get the 4-digit token number - FIX THIS BASED ON YOUR API RESPONSE
-      // Option 1: If token is directly in qrCode
+      // Get the 4-digit token number
       const tokenNumber = qrCode.token || qrCode.token_number || qrCode.backendData?.token || '0000';
-      
-      // Option 2: If token needs to be generated or extracted from another field
-      // const tokenNumber = qrCode.backendData?.token_number || String(Math.floor(1000 + Math.random() * 9000));
-      
-      // Log for first item to debug
-      if (index === 0) {
-        console.log('=== FIRST QR CODE DATA ===');
-        console.log('Architecture ID:', architectureId);
-        console.log('Architecture Details from /api/architecture/:', archDetails);
-        console.log('Name:', name);
-        console.log('Department:', department);
-        console.log('Class:', className);
-        console.log('Division:', division);
-        console.log('Full Link:', fullLink);
-        console.log('Token Number:', tokenNumber);
-        console.log('==========================');
-      }
       
       // Add text information on LEFT side
       pdf.setFontSize(5.5);
@@ -1071,7 +650,7 @@ const downloadQRCodesPDF = async () => {
           pdf.addImage(qrImage, 'PNG', qrX, qrY, qrSize, qrSize);
           
         } catch (qrError) {
-          console.error(`Error generating QR for index ${index}:`, qrError);
+          // Silently handle QR generation error
         }
       }
     }
@@ -1091,7 +670,6 @@ const downloadQRCodesPDF = async () => {
     alert(`PDF generated successfully with ${qrCodes.length} QR codes!`);
     
   } catch (error) {
-    console.error('Error in PDF generation:', error);
     alert('Error generating PDF: ' + error.message);
   }
 };
@@ -1099,23 +677,19 @@ const downloadQRCodesPDF = async () => {
 
   const downloadAllQRCodes = async () => {
   try {
-    console.log("Starting Excel generation...");
     
     // Load SheetJS library for Excel generation
     const loadSheetJS = () => {
       return new Promise((resolve, reject) => {
         if (window.XLSX) {
-          console.log("SheetJS already loaded");
           resolve();
           return;
         }
         
-        console.log("Loading SheetJS script...");
         const script = document.createElement('script');
         script.src = 'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js';
         
         script.onload = () => {
-          console.log("SheetJS loaded successfully");
           resolve();
         };
         
@@ -1169,7 +743,6 @@ const downloadQRCodesPDF = async () => {
             response = await fetch(url, { ...config, headers });
           }
         } catch (error) {
-          console.error('Token refresh failed:', error);
           return response;
         }
       }
@@ -1178,13 +751,11 @@ const downloadQRCodesPDF = async () => {
     };
     
     // Fetch all architectures to get complete details
-    console.log("Fetching all architectures from:", `${API_BASE_URL}/architecture/`);
     const architecturesResponse = await authFetch(`${API_BASE_URL}/architecture/`);
     
     let allArchitectures = [];
     if (architecturesResponse.ok) {
       allArchitectures = await architecturesResponse.json();
-      console.log(`Fetched ${allArchitectures.length} architectures`);
     }
     
     // Create a map of architecture ID to architecture data
@@ -1253,14 +824,11 @@ const downloadQRCodesPDF = async () => {
     // Save Excel file
     XLSX.writeFile(wb, fileName);
     
-    console.log(`Excel file saved as ${fileName}`);
     alert(`Excel file generated successfully with ${qrCodes.length} QR codes!`);
     
   } catch (error) {
-    console.error('Error generating Excel:', error);
     
     // Fallback to text file if Excel generation fails
-    console.log("Falling back to text file generation...");
     
     // Get the first QR code for title information
     const firstQrCode = qrCodes[0];
@@ -1318,7 +886,6 @@ const downloadQRCodesPDF = async () => {
               background: '#ffffff'
             });
           } catch (error) {
-            console.error('Error generating QR code:', error);
             // Fallback display
             const canvas = canvasRef.current;
             const ctx = canvas.getContext('2d');
@@ -1651,7 +1218,6 @@ const downloadQRCodesPDF = async () => {
         
         setArchitectures(architecturesWithTokenData);
       } catch (error) {
-        console.error('Error fetching architectures:', error);
         if (error.message.includes('Authentication')) {
           navigate('/login');
         }
@@ -1707,7 +1273,7 @@ const downloadQRCodesPDF = async () => {
         const data = await response.json();
         setTreeView(data);
       } catch (error) {
-        console.error('Error fetching tree:', error);
+        // Silently handle error
       }
     };
 
@@ -1715,7 +1281,7 @@ const downloadQRCodesPDF = async () => {
       try {
         navigate(`/architecture/${architectureId}/responses`);
       } catch (error) {
-        console.error('Error fetching architecture details:', error);
+        // Silently handle error
       }
     };
 
@@ -1723,7 +1289,7 @@ const downloadQRCodesPDF = async () => {
       try {
         navigate(`/architecture/${architectureId}/responses`);
       } catch (error) {
-        console.error('Error fetching architecture details:', error);
+        // Silently handle error
       }
     };
 
@@ -1762,7 +1328,6 @@ const downloadQRCodesPDF = async () => {
           };
         });
       } catch (error) {
-        console.error('Error fetching existing tokens:', error);
         return [];
       }
     };
@@ -1795,7 +1360,6 @@ const downloadQRCodesPDF = async () => {
         alert('Architecture created successfully!');
         setView(previousView);
       } catch (error) {
-        console.error('Error creating architecture:', error);
         alert('Error creating architecture. Please try again.');
       }
     };
@@ -1832,7 +1396,6 @@ const downloadQRCodesPDF = async () => {
         setView(previousView);
         alert('Architecture updated successfully!');
       } catch (error) {
-        console.error('Error updating architecture:', error);
         alert('Error updating architecture. Please try again.');
       }
     };
@@ -1840,20 +1403,16 @@ const downloadQRCodesPDF = async () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this architecture?')) {
       try {
-        console.log(`Attempting to delete architecture ID: ${id}`);
         
         const response = await authFetch(`${API_BASE_URL}/architecture/${id}/delete/`, {
           method: 'DELETE'
         });
         
-        console.log('Response status:', response.status);
-        
         let responseData;
         try {
           responseData = await response.json();
-          console.log('Response data:', responseData);
         } catch (e) {
-          console.log('Could not parse response as JSON');
+          // Silently handle JSON parse error
         }
         
         if (!response.ok) {
@@ -1869,7 +1428,6 @@ const downloadQRCodesPDF = async () => {
         setView(previousView);
         
       } catch (error) {
-        console.error('Error deleting architecture:', error);
         alert(`Error: ${error.message}`);
       }
     }
@@ -1918,7 +1476,6 @@ const downloadQRCodesPDF = async () => {
       try {
         // Fetch all existing tokens first
         const allTokens = await fetchExistingTokens();
-        console.log('All tokens:', allTokens);
         
         // Check which selected architectures already have tokens
         const architecturesWithTokens = [];
@@ -1928,7 +1485,6 @@ const downloadQRCodesPDF = async () => {
           const hasTokens = allTokens.some(token => 
             token.backendData.architecture === arch.id
           );
-          console.log(`Arch ${arch.id} (${arch.name}) has tokens:`, hasTokens);
           
           if (hasTokens) {
             architecturesWithTokens.push(arch);
@@ -1936,9 +1492,6 @@ const downloadQRCodesPDF = async () => {
             architecturesWithoutTokens.push(arch);
           }
         }
-        
-        console.log('With tokens:', architecturesWithTokens);
-        console.log('Without tokens:', architecturesWithoutTokens);
         
         // If ALL selected architectures already have tokens
         if (architecturesWithoutTokens.length === 0) {
@@ -1967,9 +1520,6 @@ const downloadQRCodesPDF = async () => {
         const newSelectedRows = architecturesWithoutTokens.map(arch => arch.id);
         const newSelectedArchitectures = architecturesWithoutTokens;
         
-        console.log('New selected rows:', newSelectedRows);
-        console.log('New selected architectures:', newSelectedArchitectures);
-        
         setSelectedArchitectures(newSelectedArchitectures);
         setSelectedRows(newSelectedRows);
         
@@ -1978,7 +1528,6 @@ const downloadQRCodesPDF = async () => {
         setShowQRPage(true);
         
       } catch (error) {
-        console.error('Error in handleGenerateQR:', error);
         alert('Error checking for existing tokens. Please try again.');
       }
     };
@@ -2019,9 +1568,7 @@ const downloadQRCodesPDF = async () => {
         setExistingTokens(null);
         setShowQRPage(true);
       } catch (error) {
-        console.error('Error handling QR generation:', error);
         // If there's an error fetching tokens, don't proceed with generation
-        // You might want to show an error message to the user instead
         alert('Error checking for existing tokens. Please try again.');
       }
     };
@@ -2518,7 +2065,6 @@ const downloadQRCodesPDF = async () => {
             Tree View
           </button>
           
-          {/* Add New Dropdown */}
           {/* Add New Dropdown */}
   <div className="relative ml-auto group">
     <button className="px-3 py-2 text-xs sm:text-sm md:text-base bg-green-500 text-white rounded flex items-center gap-1">
@@ -3088,4 +2634,3 @@ const downloadQRCodesPDF = async () => {
   };
 
   export default ArchitectureManager;
-    
