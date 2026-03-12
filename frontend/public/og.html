@@ -1033,7 +1033,7 @@
           <button class="btn" onclick="applyCardCornerRadius()" style="padding: 5px 15px; font-size: 12px; background: #6f42c1;">Apply to All Cards</button>
         </div>
 
-        <label><input type="checkbox" id="aspectLock" checked /> Lock Aspect Ratio</label>
+        <!-- <label><input type="checkbox" id="aspectLock" checked /> Lock Aspect Ratio</label> -->
         <button class="btn" onclick="snapToCenter()">Snap to Center</button>
       </div>
     </div>
@@ -2384,90 +2384,133 @@
       el.style.cursor = 'grab';
     }
 
- function makeResizable(wrapper, handle, isExtra = false, isText = false, side = 'front') {
-  let isResizing = false, startX, startY, startWidth, startHeight;
-  
-  handle.addEventListener('mousedown', (e) => {
-    e.stopPropagation();
-    isResizing = true;
-    startX = e.clientX;
-    startY = e.clientY;
-    startWidth = wrapper.offsetWidth;
-    startHeight = wrapper.offsetHeight;
-    
-    // Bring to front
-    wrapper.style.zIndex = zIndexCounter++;
-  });
-
-  function handleResizeMove(e) {
-    if (isResizing) {
-      let newWidth = startWidth + (e.clientX - startX);
-      let newHeight = startHeight + (e.clientY - startY);
-
-      // Check if aspect lock should be applied
-      // First, safely check if the aspectLock element exists
-      const aspectLockElement = document.getElementById('aspectLock');
-      const shouldMaintainAspect = aspectLockElement && aspectLockElement.checked;
+    function makeResizable(wrapper, handle, isExtra = false, isText = false, side = 'front') {
+      let isResizing = false, startX, startY, startWidth, startHeight;
       
-      if (!isExtra && !isText && shouldMaintainAspect) {
-        newHeight = newWidth / aspectRatio;
-      }
-
-      // Minimum size constraints
-      if (newWidth >= 20 && newHeight >= 20) {
-        wrapper.style.width = `${newWidth}px`;
-        wrapper.style.height = `${newHeight}px`;
+      handle.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        isResizing = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = wrapper.offsetWidth;
+        startHeight = wrapper.offsetHeight;
+        wrapper.style.zIndex = zIndexCounter++;
+        handle.style.cursor = 'se-resize';
         
-        // Constrain position if resizing would push element outside
-        const parent = side === 'front' ? demoFront : demoBack;
-        const left = parseFloat(wrapper.style.left) || 0;
-        const top = parseFloat(wrapper.style.top) || 0;
-        
-        if (left + newWidth > parent.clientWidth) {
-          wrapper.style.left = `${parent.clientWidth - newWidth}px`;
+        // Allow page scrolling
+        document.body.style.overflow = 'auto';
+        e.preventDefault();
+      });
+      
+      function handleResizeMove(e) {
+        if (isResizing) {
+          let newWidth = startWidth + (e.clientX - startX);
+          let newHeight = startHeight + (e.clientY - startY);
+          
+          // Check if this is the main photo (not extra and not text)
+          if (!isExtra && !isText) {
+            // This is the main photo - check aspect lock
+            if (aspectLock && aspectLock.checked) {
+              newHeight = newWidth / aspectRatio;
+            }
+          } else {
+            // This is an extra image or text element - no aspect lock
+            // No aspect ratio constraints
+          }
+          
+          // Apply minimum size constraints
+          const minSize = 20; // Minimum 20px
+          if (newWidth >= minSize && newHeight >= minSize) {
+            wrapper.style.width = `${newWidth}px`;
+            wrapper.style.height = `${newHeight}px`;
+            
+            const parent = side === 'front' ? demoFront : demoBack;
+            const left = parseFloat(wrapper.style.left) || 0;
+            const top = parseFloat(wrapper.style.top) || 0;
+            
+            // Constrain within parent
+            if (left + newWidth > parent.clientWidth) {
+              wrapper.style.left = `${parent.clientWidth - newWidth}px`;
+            }
+            if (top + newHeight > parent.clientHeight) {
+              wrapper.style.top = `${parent.clientHeight - newHeight}px`;
+            }
+            
+            // Update array
+            if (isExtra) {
+              const list = extraElements[side];
+              const item = list.find(elm => elm.id === wrapper.dataset.id);
+              if (item) {
+                item.width = newWidth;
+                item.height = newHeight;
+              }
+            } else if (isText) {
+              const list = textElements[side];
+              const item = list.find(elm => elm.id === wrapper.dataset.id);
+              if (item) {
+                item.width = newWidth;
+                item.height = newHeight;
+              }
+            } else {
+              // This is the main photo - update photoSize
+              photoSize.width = parseInt(wrapper.style.width);
+              photoSize.height = parseInt(wrapper.style.height);
+              aspectRatio = photoSize.width / photoSize.height;
+              console.log('Photo size updated:', photoSize.width, 'x', photoSize.height);
+            }
+          }
+          
+          // Auto-scroll when near edges
+          const scrollThreshold = 50;
+          const scrollSpeed = 10;
+          
+          if (e.clientY < scrollThreshold) {
+            window.scrollBy(0, -scrollSpeed);
+          } else if (e.clientY > window.innerHeight - scrollThreshold) {
+            window.scrollBy(0, scrollSpeed);
+          }
+          
+          if (e.clientX < scrollThreshold) {
+            window.scrollBy(-scrollSpeed, 0);
+          } else if (e.clientX > window.innerWidth - scrollThreshold) {
+            window.scrollBy(scrollSpeed, 0);
+          }
         }
-        
-        if (top + newHeight > parent.clientHeight) {
-          wrapper.style.top = `${parent.clientHeight - newHeight}px`;
+      }
+      
+      function handleResizeUp() {
+        if (isResizing) {
+          isResizing = false;
+          handle.style.cursor = 'se-resize';
+          
+          if (isExtra) {
+            const list = extraElements[side];
+            const item = list.find(elm => elm.id === wrapper.dataset.id);
+            if (item) {
+              item.width = parseInt(wrapper.style.width);
+              item.height = parseInt(wrapper.style.height);
+            }
+          } else if (isText) {
+            const list = textElements[side];
+            const item = list.find(elm => elm.id === wrapper.dataset.id);
+            if (item) {
+              item.width = parseInt(wrapper.style.width);
+              item.height = parseInt(wrapper.style.height);
+            }
+          } else {
+            // This is the main photo - update photoSize
+            photoSize.width = parseInt(wrapper.style.width);
+            photoSize.height = parseInt(wrapper.style.height);
+            aspectRatio = photoSize.width / photoSize.height;
+            console.log('Photo resize completed:', photoSize.width, 'x', photoSize.height);
+          }
         }
       }
+      
+      document.addEventListener('mousemove', handleResizeMove);
+      document.addEventListener('mouseup', handleResizeUp);
     }
-  }
 
-  function handleResizeUp() {
-    if (isResizing) {
-      isResizing = false;
-      if (isExtra) {
-        const list = extraElements[side];
-        const item = list.find(elm => elm.id === wrapper.dataset.id);
-        if (item) {
-          item.width = parseInt(wrapper.style.width);
-          item.height = parseInt(wrapper.style.height);
-        }
-      } else if (isText) {
-        const list = textElements[side];
-        const item = list.find(elm => elm.id === wrapper.dataset.id);
-        if (item) {
-          item.width = parseInt(wrapper.style.width);
-          item.height = parseInt(wrapper.style.height);
-        }
-      } else {
-        photoSize.width = parseInt(wrapper.style.width);
-        photoSize.height = parseInt(wrapper.style.height);
-        aspectRatio = photoSize.width / photoSize.height;
-      }
-    }
-  }
-
-  document.addEventListener('mousemove', handleResizeMove);
-  document.addEventListener('mouseup', handleResizeUp);
-  
-  // Clean up function to remove event listeners when element is removed
-  return function cleanup() {
-    document.removeEventListener('mousemove', handleResizeMove);
-    document.removeEventListener('mouseup', handleResizeUp);
-  };
-}
     function snapToCenter() {
       const wrapper = demoFront.querySelector('div');
       if (!wrapper) return;
@@ -5225,7 +5268,7 @@ backCardDiv.style.borderLeft = 'none';
                 // frontCardDiv.style.borderRight = '1px solid #000000';
                 // frontCardDiv.style.borderBottom = '1px solid #000000';
                 // frontCardDiv.style.borderLeft = '1px solid #000000';
-                 // Remove borders for pairs layout
+                // Remove borders for pairs layout
 frontCardDiv.style.border = 'none';
 frontCardDiv.style.borderTop = 'none';
 frontCardDiv.style.borderRight = 'none';

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import slide1 from "../assets/images/14.png";
 import slide3 from "../assets/images/g20.jpg";
-import slide4Image from "../assets/images/FN.jpg";
+import slide4Image from "../assets/images/h2.jpg";
 
 // DesktopMonitorSlideshow component
 const DesktopMonitorSlideshow = () => {
